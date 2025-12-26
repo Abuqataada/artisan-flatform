@@ -9,6 +9,9 @@ from datetime import datetime, timedelta, timezone
 from dateutil import tz
 from dotenv import load_dotenv
 from extension import app
+import tempfile
+from config import config
+
 
 import cloudinary
 import cloudinary.uploader
@@ -17,17 +20,26 @@ import cloudinary.uploader
 login_manager = LoginManager()
 migrate = Migrate()
 
-def create_app(config_class=Config):
-    app.config['UPLOAD_FOLDER'] = 'static/uploads'
-    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-
+def create_app(config_class):
+    # Load configuration FIRST
     app.config.from_object(config_class)
+    
+    # Configure upload folder - use temp directory in serverless environments
+    if os.environ.get('SERVERLESS') or os.environ.get('FLASK_ENV') == 'production':
+        # Use temp directory in serverless/production
+        app.config['UPLOAD_FOLDER'] = os.path.join(tempfile.gettempdir(), 'uploads')
+    else:
+        # Use local directory in development
+        app.config['UPLOAD_FOLDER'] = 'static/uploads'
+    
+    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
     
     # Initialize Cloudinary if credentials exist
     if (app.config.get('CLOUDINARY_CLOUD_NAME') and 
         app.config.get('CLOUDINARY_API_KEY') and 
         app.config.get('CLOUDINARY_API_SECRET')):
         
+        import cloudinary
         cloudinary.config(
             cloud_name=app.config['CLOUDINARY_CLOUD_NAME'],
             api_key=app.config['CLOUDINARY_API_KEY'],
@@ -44,8 +56,8 @@ def create_app(config_class=Config):
                 upload_path = app.config['UPLOAD_FOLDER']
                 os.makedirs(os.path.join(upload_path, 'portfolio'), exist_ok=True)
                 os.makedirs(os.path.join(upload_path, 'temp'), exist_ok=True)
-            except OSError:
-                print("Warning: Could not create upload directories")
+            except OSError as e:
+                print(f"Warning: Could not create upload directories: {e}")
     
     # Initialize extensions
     db.init_app(app)
@@ -175,7 +187,12 @@ def create_app(config_class=Config):
 
 load_dotenv()
 
-app = create_app()
+# Determine the configuration based on environment
+config_name = os.environ.get('FLASK_ENV', 'default')
+if os.environ.get('SERVERLESS'):
+    config_name = 'serverless'
+
+app = create_app(config[config_name])
 
 # Main routes
 @app.route('/')
