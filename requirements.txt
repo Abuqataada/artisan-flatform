@@ -13,3 +13,5 @@ MarkupSafe
 SQLAlchemy
 itsdangerous
 click
+cloudinary
+python-dateutil
