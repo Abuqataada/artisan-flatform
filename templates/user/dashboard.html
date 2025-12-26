@@ -3,200 +3,287 @@
 {% block title %}Client Dashboard - Uwaila Global{% endblock %}
 
 {% block content %}
-<div class="row">
-    <!-- Sidebar -->
-    <div class="col-md-3 mb-4">
-        <div class="card border-0 shadow-sm">
-            <div class="card-body">
-                <div class="text-center mb-4">
-                    <div class="avatar-circle bg-primary text-white mb-3 mx-auto">
-                        <i class="fas fa-user fa-2x"></i>
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3 col-lg-2 d-md-block sidebar">
+            <div class="position-sticky">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body text-center">
+                        <div class="avatar-circle bg-primary text-white mb-3 mx-auto">
+                            <i class="fas fa-user fa-2x"></i>
+                        </div>
+                        <h5 class="card-title mb-1">{{ current_user.full_name }}</h5>
+                        <p class="text-muted small mb-3">{{ current_user.email }}</p>
+                        
+                        <!-- Quick Stats -->
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <span class="stat-number">{{ stats.total_requests }}</span>
+                                <span class="stat-label">Total</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-number text-warning">{{ stats.pending_requests }}</span>
+                                <span class="stat-label">Pending</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-number text-success">{{ stats.completed_requests }}</span>
+                                <span class="stat-label">Done</span>
+                            </div>
+                        </div>
                     </div>
-                    <h5 class="card-title">{{ current_user.full_name }}</h5>
-                    <p class="text-muted small">{{ current_user.email }}</p>
                 </div>
                 
-                <div class="list-group list-group-flush">
-                    <a href="{{ url_for('user_dashboard') }}" class="list-group-item list-group-item-action active">
+                <!-- Navigation -->
+                <nav class="nav flex-column">
+                    <a class="nav-link active" href="{{ url_for('user_bp.dashboard') }}">
                         <i class="fas fa-tachometer-alt me-2"></i>Dashboard
                     </a>
-                    <a href="{{ url_for('create_service_request') }}" class="list-group-item list-group-item-action">
+                    <a class="nav-link" href="{{ url_for('user_bp.create_service_request') }}">
                         <i class="fas fa-plus-circle me-2"></i>New Request
                     </a>
-                    <a href="{{ url_for('my_requests') }}" class="list-group-item list-group-item-action">
+                    <a class="nav-link" href="{{ url_for('user_bp.my_requests') }}">
                         <i class="fas fa-list-alt me-2"></i>My Requests
                     </a>
-                    <a href="{{ url_for('profile') }}" class="list-group-item list-group-item-action">
-                        <i class="fas fa-user-cog me-2"></i>Profile Settings
+                    <a class="nav-link" href="{{ url_for('user_bp.services') }}">
+                        <i class="fas fa-concierge-bell me-2"></i>Services
                     </a>
-                    <a href="{{ url_for('notifications') }}" class="list-group-item list-group-item-action">
+                    <a class="nav-link" href="{{ url_for('user_bp.get_notifications') }}">
                         <i class="fas fa-bell me-2"></i>Notifications
                         {% if unread_notifications > 0 %}
                         <span class="badge bg-danger float-end">{{ unread_notifications }}</span>
                         {% endif %}
                     </a>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Quick Stats -->
-        <div class="card border-0 shadow-sm mt-4">
-            <div class="card-body">
-                <h6 class="card-title mb-3"><i class="fas fa-chart-bar me-2"></i>Quick Stats</h6>
-                <div class="d-flex justify-content-between mb-2">
-                    <span>Total Requests:</span>
-                    <strong>{{ stats.total_requests }}</strong>
-                </div>
-                <div class="d-flex justify-content-between mb-2">
-                    <span>Pending:</span>
-                    <strong class="text-warning">{{ stats.pending_requests }}</strong>
-                </div>
-                <div class="d-flex justify-content-between mb-2">
-                    <span>In Progress:</span>
-                    <strong class="text-info">{{ stats.in_progress_requests }}</strong>
-                </div>
-                <div class="d-flex justify-content-between">
-                    <span>Completed:</span>
-                    <strong class="text-success">{{ stats.completed_requests }}</strong>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Main Content -->
-    <div class="col-md-9">
-        <!-- Welcome Card -->
-        <div class="card border-0 shadow-sm bg-primary text-white mb-4">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h4 class="card-title mb-1">Welcome back, {{ current_user.full_name }}!</h4>
-                        <p class="card-text mb-0">You have {{ stats.pending_requests }} pending service requests</p>
-                    </div>
-                    <a href="{{ url_for('create_service_request') }}" class="btn btn-light">
-                        <i class="fas fa-plus me-1"></i>New Request
+                    <a class="nav-link" href="{{ url_for('user_bp.profile') }}">
+                        <i class="fas fa-user-cog me-2"></i>Profile
                     </a>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Quick Actions -->
-        <div class="row mb-4">
-            <div class="col-md-4 mb-3">
-                <div class="card border-0 shadow-sm h-100 text-center p-4 hover-shadow">
-                    <i class="fas fa-plus-circle fa-3x text-primary mb-3"></i>
-                    <h5>Request Service</h5>
-                    <p class="small">Submit a new service request</p>
-                    <a href="{{ url_for('create_service_request') }}" class="btn btn-outline-primary">Get Started</a>
-                </div>
-            </div>
-            <div class="col-md-4 mb-3">
-                <div class="card border-0 shadow-sm h-100 text-center p-4 hover-shadow">
-                    <i class="fas fa-history fa-3x text-info mb-3"></i>
-                    <h5>Track Requests</h5>
-                    <p class="small">Monitor your service requests</p>
-                    <a href="{{ url_for('my_requests') }}" class="btn btn-outline-info">View All</a>
-                </div>
-            </div>
-            <div class="col-md-4 mb-3">
-                <div class="card border-0 shadow-sm h-100 text-center p-4 hover-shadow">
-                    <i class="fas fa-star fa-3x text-warning mb-3"></i>
-                    <h5>Leave Feedback</h5>
-                    <p class="small">Rate completed services</p>
-                    <a href="{{ url_for('completed_requests') }}" class="btn btn-outline-warning">Give Feedback</a>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Recent Requests -->
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white border-0">
-                <h5 class="card-title mb-0"><i class="fas fa-clock me-2"></i>Recent Service Requests</h5>
-            </div>
-            <div class="card-body">
-                {% if recent_requests %}
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Service</th>
-                                <th>Category</th>
-                                <th>Status</th>
-                                <th>Date</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for request in recent_requests %}
-                            <tr>
-                                <td>
-                                    <strong>{{ request.title }}</strong>
-                                    <br>
-                                    <small class="text-muted">{{ request.description|truncate(50) }}</small>
-                                </td>
-                                <td>{{ request.category.name }}</td>
-                                <td>
-                                    <span class="badge bg-{{ 
-                                        'warning' if request.status == 'pending' 
-                                        else 'info' if request.status == 'assigned' 
-                                        else 'primary' if request.status == 'in_progress' 
-                                        else 'success' if request.status == 'completed' 
-                                        else 'danger' 
-                                    }}">
-                                        {{ request.status|title }}
-                                    </span>
-                                </td>
-                                <td>{{ request.created_at.strftime('%Y-%m-%d') }}</td>
-                                <td>
-                                    <a href="{{ url_for('view_request', request_id=request.id) }}" 
-                                       class="btn btn-sm btn-outline-primary">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                <div class="text-center mt-3">
-                    <a href="{{ url_for('my_requests') }}" class="btn btn-primary">View All Requests</a>
-                </div>
-                {% else %}
-                <div class="text-center py-5">
-                    <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
-                    <h5>No service requests yet</h5>
-                    <p class="text-muted">Submit your first service request to get started</p>
-                    <a href="{{ url_for('create_service_request') }}" class="btn btn-primary">
-                        <i class="fas fa-plus me-1"></i>Request Service
+                    <a class="nav-link text-danger" href="{{ url_for('user_bp.logout') }}">
+                        <i class="fas fa-sign-out-alt me-2"></i>Logout
                     </a>
-                </div>
-                {% endif %}
+                </nav>
             </div>
         </div>
         
-        <!-- Service Categories -->
-        <div class="card border-0 shadow-sm mt-4">
-            <div class="card-header bg-white border-0">
-                <h5 class="card-title mb-0"><i class="fas fa-list me-2"></i>Available Services</h5>
+        <!-- Main Content -->
+        <div class="col-md-9 col-lg-10 main-content">
+            <!-- Welcome Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-1">Welcome back, {{ current_user.full_name.split()[0] }}!</h1>
+                    <p class="text-muted">You have {{ stats.pending_requests }} pending service requests</p>
+                </div>
+                <a href="{{ url_for('user_bp.create_service_request') }}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>New Service Request
+                </a>
             </div>
-            <div class="card-body">
-                <div class="row">
-                    {% for category in categories[:6] %}
-                    <div class="col-md-4 mb-3">
-                        <div class="d-flex align-items-center p-3 border rounded hover-shadow">
-                            <div class="flex-shrink-0">
-                                <i class="fas fa-{{ category.icon|default('tools') }} fa-2x text-primary"></i>
-                            </div>
-                            <div class="flex-grow-1 ms-3">
-                                <h6 class="mb-1">{{ category.name }}</h6>
-                                <p class="small text-muted mb-0">{{ category.description|truncate(40) }}</p>
+            
+            <!-- Quick Stats Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card stat-card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="card-title">Total Requests</h6>
+                                    <h2 class="mb-0">{{ stats.total_requests }}</h2>
+                                </div>
+                                <i class="fas fa-clipboard-list fa-2x opacity-50"></i>
                             </div>
                         </div>
                     </div>
-                    {% endfor %}
                 </div>
-                <div class="text-center mt-3">
-                    <a href="{{ url_for('services') }}" class="btn btn-outline-primary">View All Services</a>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card stat-card bg-warning text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="card-title">Pending</h6>
+                                    <h2 class="mb-0">{{ stats.pending_requests }}</h2>
+                                </div>
+                                <i class="fas fa-clock fa-2x opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card stat-card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="card-title">In Progress</h6>
+                                    <h2 class="mb-0">{{ stats.in_progress_requests }}</h2>
+                                </div>
+                                <i class="fas fa-spinner fa-2x opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card stat-card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="card-title">Completed</h6>
+                                    <h2 class="mb-0">{{ stats.completed_requests }}</h2>
+                                </div>
+                                <i class="fas fa-check-circle fa-2x opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="row mb-4">
+                <div class="col-md-4 mb-3">
+                    <div class="card action-card h-100 text-center">
+                        <div class="card-body">
+                            <div class="action-icon mb-3">
+                                <i class="fas fa-plus-circle fa-3x text-primary"></i>
+                            </div>
+                            <h5>Request Service</h5>
+                            <p class="text-muted small">Submit a new service request for any of our services</p>
+                            <a href="{{ url_for('user_bp.create_service_request') }}" class="btn btn-primary btn-sm">
+                                Get Started <i class="fas fa-arrow-right ms-1"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card action-card h-100 text-center">
+                        <div class="card-body">
+                            <div class="action-icon mb-3">
+                                <i class="fas fa-history fa-3x text-info"></i>
+                            </div>
+                            <h5>Track Requests</h5>
+                            <p class="text-muted small">Monitor the status of your service requests in real-time</p>
+                            <a href="{{ url_for('user_bp.my_requests') }}" class="btn btn-info btn-sm">
+                                View All <i class="fas fa-arrow-right ms-1"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card action-card h-100 text-center">
+                        <div class="card-body">
+                            <div class="action-icon mb-3">
+                                <i class="fas fa-star fa-3x text-warning"></i>
+                            </div>
+                            <h5>Leave Feedback</h5>
+                            <p class="text-muted small">Rate completed services and help us improve</p>
+                            <a href="{{ url_for('user_bp.completed_requests') }}" class="btn btn-warning btn-sm">
+                                Give Feedback <i class="fas fa-arrow-right ms-1"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Requests & Services Side by Side -->
+            <div class="row">
+                <!-- Recent Requests -->
+                <div class="col-lg-8 mb-4">
+                    <div class="card">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Recent Requests</h5>
+                            <a href="{{ url_for('user_bp.my_requests') }}" class="btn btn-sm btn-outline-primary">
+                                View All <i class="fas fa-arrow-right ms-1"></i>
+                            </a>
+                        </div>
+                        <div class="card-body">
+                            {% if recent_requests %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Service</th>
+                                            <th>Status</th>
+                                            <th>Date</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for request in recent_requests %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ request.title }}</strong>
+                                                <br>
+                                                <small class="text-muted">{{ request.description|truncate(50) }}</small>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-{{ 
+                                                    'warning' if request.status == 'pending' 
+                                                    else 'info' if request.status == 'assigned' or request.status == 'in_progress'
+                                                    else 'success' if request.status == 'completed' 
+                                                    else 'danger' 
+                                                }}">
+                                                    {{ request.status|replace('_', ' ')|title }}
+                                                </span>
+                                            </td>
+                                            <td>{{ request.created_at.strftime('%b %d, %Y') }}</td>
+                                            <td>
+                                                <a href="{{ url_for('user_bp.view_request', request_id=request.id) }}" 
+                                                   class="btn btn-sm btn-outline-primary">
+                                                    <i class="fas fa-eye"></i> View
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                                <h5>No service requests yet</h5>
+                                <p class="text-muted mb-3">You haven't submitted any service requests yet</p>
+                                <a href="{{ url_for('user_bp.create_service_request') }}" class="btn btn-primary">
+                                    <i class="fas fa-plus me-1"></i>Create Your First Request
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Available Services -->
+                <div class="col-lg-4 mb-4">
+                    <div class="card">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="fas fa-concierge-bell me-2"></i>Popular Services</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if categories %}
+                            <div class="list-group list-group-flush">
+                                {% for category in categories[:6] %}
+                                <div class="list-group-item border-0 px-0 py-3">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-shrink-0">
+                                            <div class="service-icon">
+                                                <i class="fas fa-{{ category.icon|default('tools') }} text-primary"></i>
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1 ms-3">
+                                            <h6 class="mb-1">{{ category.name }}</h6>
+                                            <p class="small text-muted mb-0">{{ category.description|truncate(50) }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div class="text-center mt-3">
+                                <a href="{{ url_for('user_bp.services') }}" class="btn btn-outline-primary btn-sm">
+                                    View All Services <i class="fas fa-arrow-right ms-1"></i>
+                                </a>
+                            </div>
+                            {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-concierge-bell fa-3x text-muted mb-3"></i>
+                                <p class="text-muted">No services available at the moment</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -206,6 +293,17 @@
 
 {% block styles %}
 <style>
+    .sidebar {
+        background: #f8f9fa;
+        min-height: calc(100vh - 56px);
+        border-right: 1px solid #dee2e6;
+    }
+    
+    .main-content {
+        padding: 2rem;
+        background: #fff;
+    }
+    
     .avatar-circle {
         width: 80px;
         height: 80px;
@@ -213,10 +311,121 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        margin: 0 auto;
     }
-    .hover-shadow:hover {
-        box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15)!important;
-        transition: all 0.3s ease;
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-top: 1rem;
+    }
+    
+    .stat-item {
+        text-align: center;
+        padding: 5px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+    }
+    
+    .stat-number {
+        font-size: 1.2rem;
+        font-weight: bold;
+        display: block;
+    }
+    
+    .stat-label {
+        font-size: 0.8rem;
+        opacity: 0.9;
+    }
+    
+    .stat-card {
+        border-radius: 10px;
+        transition: transform 0.3s;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .action-card {
+        border: 1px solid #dee2e6;
+        border-radius: 10px;
+        transition: all 0.3s;
+    }
+    
+    .action-card:hover {
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        transform: translateY(-3px);
+    }
+    
+    .action-icon {
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+        background: rgba(13, 110, 253, 0.1);
+    }
+    
+    .service-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        background: rgba(13, 110, 253, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .nav-link {
+        padding: 12px 20px;
+        border-radius: 8px;
+        margin-bottom: 5px;
+        color: #495057;
+        transition: all 0.3s;
+    }
+    
+    .nav-link:hover {
+        background-color: rgba(13, 110, 253, 0.1);
+        color: #0d6efd;
+    }
+    
+    .nav-link.active {
+        background-color: #0d6efd;
+        color: white;
+    }
+    
+    @media (max-width: 768px) {
+        .sidebar {
+            min-height: auto;
+            margin-bottom: 1rem;
+        }
+        .main-content {
+            padding: 1rem;
+        }
     }
 </style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Add any dashboard-specific JavaScript here
+    document.addEventListener('DOMContentLoaded', function() {
+        // Auto-refresh notifications count every 30 seconds
+        setInterval(function() {
+            fetch('{{ url_for("user_bp.get_notifications") }}?count_only=true')
+                .then(response => response.json())
+                .then(data => {
+                    const badge = document.querySelector('.notification-badge');
+                    if (badge && data.unread_count > 0) {
+                        badge.textContent = data.unread_count;
+                        badge.style.display = 'inline-block';
+                    }
+                });
+        }, 30000);
+    });
+</script>
 {% endblock %}

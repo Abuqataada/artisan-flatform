@@ -20,6 +20,143 @@ import cloudinary.uploader
 login_manager = LoginManager()
 migrate = Migrate()
 
+def populate_service_categories():
+    """Populate database with categories matching the HTML form"""
+    
+    categories = [
+        # 🏗️ Construction & Building
+        {'name': 'Masonry', 'description': 'Bricklaying, Concrete Work', 'icon': 'brick'},
+        {'name': 'Carpentry', 'description': 'Carpentry & Woodwork', 'icon': 'hammer'},
+        {'name': 'Roofing', 'description': 'Roofing & Waterproofing', 'icon': 'house'},
+        {'name': 'Tiling', 'description': 'Tiling & Flooring', 'icon': 'tile'},
+        {'name': 'Painting', 'description': 'Painting & Decoration', 'icon': 'paint-roller'},
+        {'name': 'Drywall', 'description': 'Drywall Installation', 'icon': 'layer-group'},
+        {'name': 'Steel Fabrication', 'description': 'Steel Fabrication', 'icon': 'industry'},
+        {'name': 'Glass Work', 'description': 'Glass & Aluminum Work', 'icon': 'glass-whiskey'},
+        
+        # ⚡ Electrical Services
+        {'name': 'Electrical Wiring', 'description': 'Electrical Wiring & Installation', 'icon': 'bolt'},
+        {'name': 'Lighting', 'description': 'Lighting Installation', 'icon': 'lightbulb'},
+        {'name': 'Generator Repair', 'description': 'Generator Installation & Repair', 'icon': 'charging-station'},
+        {'name': 'Solar Installation', 'description': 'Solar System Installation', 'icon': 'solar-panel'},
+        {'name': 'Inverter Systems', 'description': 'Inverter & UPS Systems', 'icon': 'plug'},
+        {'name': 'Security Systems', 'description': 'Security & CCTV Installation', 'icon': 'shield-alt'},
+        {'name': 'Home Automation', 'description': 'Home Automation & Smart Systems', 'icon': 'home'},
+        
+        # 🚰 Plumbing Services
+        {'name': 'Plumbing', 'description': 'General Plumbing', 'icon': 'faucet'},
+        {'name': 'Pipe Fitting', 'description': 'Pipe Fitting & Installation', 'icon': 'pipe'},
+        {'name': 'Water Heater', 'description': 'Water Heater Installation', 'icon': 'temperature-high'},
+        {'name': 'Borehole', 'description': 'Borehole Drilling & Maintenance', 'icon': 'water'},
+        {'name': 'Water Treatment', 'description': 'Water Treatment Systems', 'icon': 'filter'},
+        {'name': 'Septic Tank', 'description': 'Septic Tank Installation', 'icon': 'toilet'},
+        {'name': 'Drainage', 'description': 'Drainage & Sewer Systems', 'icon': 'water'},
+        
+        # ❄️ HVAC & Cooling
+        {'name': 'AC Installation', 'description': 'Air Conditioner Installation', 'icon': 'snowflake'},
+        {'name': 'AC Repair', 'description': 'Air Conditioner Repair', 'icon': 'tools'},
+        {'name': 'AC Maintenance', 'description': 'AC Maintenance & Servicing', 'icon': 'wrench'},
+        {'name': 'Refrigeration', 'description': 'Refrigeration Systems', 'icon': 'temperature-low'},
+        {'name': 'Ventilation', 'description': 'Ventilation Systems', 'icon': 'fan'},
+        {'name': 'Cold Room', 'description': 'Cold Room Installation', 'icon': 'warehouse'},
+        
+        # 🏠 Home Services
+        {'name': 'Cleaning', 'description': 'Cleaning & Janitorial', 'icon': 'broom'},
+        {'name': 'Pest Control', 'description': 'Pest Control & Fumigation', 'icon': 'bug'},
+        {'name': 'Laundry', 'description': 'Laundry & Dry Cleaning', 'icon': 'tshirt'},
+        {'name': 'Gardening', 'description': 'Gardening & Landscaping', 'icon': 'leaf'},
+        {'name': 'Home Organizing', 'description': 'Home Organizing', 'icon': 'boxes'},
+        {'name': 'Moving', 'description': 'Moving & Relocation', 'icon': 'truck-moving'},
+        
+        # 🔧 Mechanical & Automotive
+        {'name': 'Auto Repair', 'description': 'Automobile Repair', 'icon': 'car'},
+        {'name': 'Auto Electrician', 'description': 'Auto Electrician', 'icon': 'car-battery'},
+        {'name': 'Panel Beating', 'description': 'Panel Beating & Spraying', 'icon': 'hammer'},
+        {'name': 'Generator Maintenance', 'description': 'Generator Maintenance', 'icon': 'cog'},
+        {'name': 'Elevator Repair', 'description': 'Elevator & Escalator Repair', 'icon': 'arrow-up'},
+        {'name': 'Industrial Machines', 'description': 'Industrial Machine Repair', 'icon': 'cogs'},
+        
+        # 💻 Technology & IT
+        {'name': 'Computer Repair', 'description': 'Computer & Laptop Repair', 'icon': 'laptop'},
+        {'name': 'Phone Repair', 'description': 'Phone & Tablet Repair', 'icon': 'mobile-alt'},
+        {'name': 'Network Setup', 'description': 'Network & WiFi Setup', 'icon': 'wifi'},
+        {'name': 'Smartphone Repair', 'description': 'Smartphone Repair', 'icon': 'mobile'},
+        {'name': 'TV Repair', 'description': 'TV & Electronics Repair', 'icon': 'tv'},
+        {'name': 'Sound Systems', 'description': 'Sound System Installation', 'icon': 'volume-up'},
+        
+        # 🛋️ Furniture & Interior
+        {'name': 'Furniture Making', 'description': 'Furniture Making', 'icon': 'chair'},
+        {'name': 'Upholstery', 'description': 'Upholstery & Repair', 'icon': 'couch'},
+        {'name': 'Curtains', 'description': 'Curtains & Blinds Installation', 'icon': 'window-restore'},
+        {'name': 'Interior Design', 'description': 'Interior Design', 'icon': 'palette'},
+        {'name': 'Cabinet Making', 'description': 'Cabinet Making', 'icon': 'archive'},
+        
+        # 🔩 Metal Work
+        {'name': 'Welding', 'description': 'Welding & Fabrication', 'icon': 'fire'},
+        {'name': 'Blacksmith', 'description': 'Blacksmithing', 'icon': 'hammer'},
+        {'name': 'Gate Making', 'description': 'Gate & Fence Making', 'icon': 'gate'},
+        {'name': 'Metal Doors', 'description': 'Metal Doors & Windows', 'icon': 'door-closed'},
+        {'name': 'Iron Bending', 'description': 'Iron Bending', 'icon': 'tools'},
+        
+        # 💅 Beauty & Personal Care
+        {'name': 'Hair Styling', 'description': 'Hair Styling & Barbering', 'icon': 'cut'},
+        {'name': 'Makeup Artist', 'description': 'Makeup Artist', 'icon': 'spray-can'},
+        {'name': 'Nail Technician', 'description': 'Nail Technician', 'icon': 'hand-paper'},
+        {'name': 'Spa Services', 'description': 'Spa & Massage Therapy', 'icon': 'spa'},
+        {'name': 'Tailoring', 'description': 'Tailoring & Fashion Design', 'icon': 'tshirt'},
+        
+        # 🎉 Event Services
+        {'name': 'Catering', 'description': 'Catering & Cooking', 'icon': 'utensils'},
+        {'name': 'Photography', 'description': 'Photography & Videography', 'icon': 'camera'},
+        {'name': 'Event Decoration', 'description': 'Event Decoration', 'icon': 'glass-cheers'},
+        {'name': 'DJ Services', 'description': 'DJ & Sound Services', 'icon': 'music'},
+        {'name': 'MC Services', 'description': 'MC & Event Hosting', 'icon': 'microphone'},
+        
+        # 👔 Professional Services
+        {'name': 'Tutoring', 'description': 'Tutoring & Teaching', 'icon': 'chalkboard-teacher'},
+        {'name': 'Graphic Design', 'description': 'Graphic Design', 'icon': 'paint-brush'},
+        {'name': 'Writing', 'description': 'Writing & Editing', 'icon': 'pen'},
+        {'name': 'Web Development', 'description': 'Web Development', 'icon': 'code'},
+        {'name': 'Legal Services', 'description': 'Legal Services', 'icon': 'balance-scale'},
+        {'name': 'Accounting', 'description': 'Accounting & Bookkeeping', 'icon': 'calculator'},
+        
+        # 🏥 Health & Wellness
+        {'name': 'Fitness Training', 'description': 'Fitness Training', 'icon': 'running'},
+        {'name': 'Yoga Instruction', 'description': 'Yoga Instruction', 'icon': 'spa'},
+        {'name': 'Nutritionist', 'description': 'Nutritionist', 'icon': 'apple-alt'},
+        {'name': 'Home Nursing', 'description': 'Home Nursing Care', 'icon': 'heartbeat'},
+        {'name': 'Therapy', 'description': 'Physical Therapy', 'icon': 'hands-helping'},
+        
+        # 🚚 Logistics & Delivery
+        {'name': 'Delivery Services', 'description': 'Delivery Services', 'icon': 'shipping-fast'},
+        {'name': 'Transportation', 'description': 'Transportation Services', 'icon': 'bus'},
+        {'name': 'Errand Running', 'description': 'Errand Running', 'icon': 'walking'},
+        {'name': 'Courier Services', 'description': 'Courier Services', 'icon': 'envelope'},
+        
+        # 📋 Other Services
+        {'name': 'Laundry', 'description': 'Laundry & Ironing', 'icon': 'tshirt'},
+        {'name': 'Child Care', 'description': 'Child Care Services', 'icon': 'baby'},
+        {'name': 'Elderly Care', 'description': 'Elderly Care Services', 'icon': 'user-friends'},
+        {'name': 'Pet Care', 'description': 'Pet Care & Grooming', 'icon': 'paw'},
+        {'name': 'Other', 'description': 'Other Services', 'icon': 'ellipsis-h'},
+    ]
+    
+    for cat_data in categories:
+        # Check if category already exists
+        existing = ServiceCategory.query.filter_by(name=cat_data['name']).first()
+        if not existing:
+            category = ServiceCategory(
+                name=cat_data['name'],
+                description=cat_data.get('description', ''),
+                icon=cat_data.get('icon', 'tools')
+            )
+            db.session.add(category)
+    
+    db.session.commit()
+    print(f"Added {len(categories)} service categories to database")
+
+
+
 def create_app(config_class):
     # Load configuration FIRST
     app.config.from_object(config_class)
@@ -164,6 +301,10 @@ def create_app(config_class):
     # Create database tables
     with app.app_context():
         db.create_all()
+
+        # Populate service categories if empty
+        if ServiceCategory.query.count() == 0:
+            populate_service_categories()
         
         # Create default admin if not exists
         if not Admin.query.filter_by(email='admin@uwailaglobal.com').first():

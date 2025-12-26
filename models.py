@@ -105,6 +105,7 @@ class Admin(UserMixin, db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+
 class ServiceCategory(db.Model):
     """Service Categories Model"""
     __tablename__ = 'service_categories'
@@ -116,14 +117,18 @@ class ServiceCategory(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc))
     
+    # Relationship - This defines the connection to ServiceRequest
+    service_requests = db.relationship('ServiceRequest', backref='category', lazy=True)
+    
     def to_dict(self):
         return {
             'id': self.id,
             'name': self.name,
             'description': self.description,
-            'icon': self.icon
+            'icon': self.icon,
+            'is_active': self.is_active
         }
-
+    
 class ServiceRequest(db.Model):
     """Service Request Model"""
     __tablename__ = 'service_requests'
@@ -146,8 +151,8 @@ class ServiceRequest(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
 
-    # Relationships
-    category = db.relationship('ServiceCategory', backref='service_requests', lazy=True)
+    # FIXED: Remove the duplicate relationship line below
+    # category = db.relationship('ServiceCategory', backref='service_requests', lazy=True)  # REMOVE THIS LINE
     
     def to_dict(self):
         return {
@@ -158,11 +163,11 @@ class ServiceRequest(db.Model):
             'location': self.location,
             'preferred_date': self.preferred_date.isoformat() if self.preferred_date else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'category': self.category.name if self.category else None,
+            'category': self.category.name if self.category else None,  # This works via the relationship in ServiceCategory
             'artisan_name': self.assigned_artisan.full_name if self.assigned_artisan else None,
             'client_name': self.client.full_name if self.client else None
         }
-
+    
 class Notification(db.Model):
     """Notification System Model"""
     __tablename__ = 'notifications'

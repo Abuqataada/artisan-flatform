@@ -1,0 +1,772 @@
+{% extends "base.html" %}
+
+{% block title %}My Service Requests - Uwaila Global{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-1">My Service Requests</h1>
+            <p class="text-muted mb-0">Track and manage all your service requests</p>
+        </div>
+        <a href="{{ url_for('user_bp.create_service_request') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>New Request
+        </a>
+    </div>
+
+    <!-- Stats Summary -->
+    <div class="row mb-4">
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card stat-card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">Total</h6>
+                            <h2 class="mb-0">{{ requests|length }}</h2>
+                        </div>
+                        <i class="fas fa-clipboard-list fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card stat-card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">Pending</h6>
+                            <h2 class="mb-0">{{ requests|selectattr('status', 'equalto', 'pending')|list|length }}</h2>
+                        </div>
+                        <i class="fas fa-clock fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card stat-card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">In Progress</h6>
+                            <h2 class="mb-0">{{ requests|selectattr('status', 'equalto', 'in_progress')|list|length }}</h2>
+                        </div>
+                        <i class="fas fa-spinner fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card stat-card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">Completed</h6>
+                            <h2 class="mb-0">{{ requests|selectattr('status', 'equalto', 'completed')|list|length }}</h2>
+                        </div>
+                        <i class="fas fa-check-circle fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter and Search Bar -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label for="statusFilter" class="form-label">Filter by Status</label>
+                    <select class="form-select" id="statusFilter">
+                        <option value="all">All Statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="assigned">Assigned</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="dateFilter" class="form-label">Filter by Date</label>
+                    <select class="form-select" id="dateFilter">
+                        <option value="all">All Time</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="searchInput" class="form-label">Search</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search by title, description...">
+                        <button class="btn btn-outline-secondary" type="button" id="searchButton">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Requests Table -->
+    <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">All Service Requests</h5>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="listViewBtn">
+                    <i class="fas fa-list"></i> List
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="gridViewBtn">
+                    <i class="fas fa-th"></i> Grid
+                </button>
+            </div>
+        </div>
+        
+        <div class="card-body p-0">
+            {% if requests %}
+                <!-- Table View -->
+                <div class="table-responsive" id="tableView">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="300">Service Request</th>
+                                <th>Category</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                                <th>Artisan</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for request in requests %}
+                            <tr class="request-row" 
+                                data-status="{{ request.status }}"
+                                data-date="{{ request.created_at.strftime('%Y-%m-%d') }}"
+                                data-search="{{ request.title|lower }} {{ request.description|lower }}">
+                                <td>
+                                    <div class="d-flex align-items-start">
+                                        <div class="flex-shrink-0">
+                                            <div class="request-icon">
+                                                <i class="fas fa-{{ request.category.icon|default('tools') }}"></i>
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1 ms-3">
+                                            <h6 class="mb-1">{{ request.title }}</h6>
+                                            <p class="text-muted small mb-0">{{ request.description|truncate(80) }}</p>
+                                            <small class="text-muted">
+                                                <i class="fas fa-map-marker-alt me-1"></i>{{ request.location }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark">
+                                        <i class="fas fa-{{ request.category.icon|default('tools') }} me-1"></i>
+                                        {{ request.category.name }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 
+                                        'warning' if request.status == 'pending' 
+                                        else 'info' if request.status == 'assigned' 
+                                        else 'primary' if request.status == 'in_progress' 
+                                        else 'success' if request.status == 'completed' 
+                                        else 'danger' 
+                                    }} p-2">
+                                        <i class="fas fa-{{ 
+                                            'clock' if request.status == 'pending' 
+                                            else 'user-check' if request.status == 'assigned' 
+                                            else 'spinner' if request.status == 'in_progress' 
+                                            else 'check-circle' if request.status == 'completed' 
+                                            else 'times-circle' 
+                                        }} me-1"></i>
+                                        {{ request.status|replace('_', ' ')|title }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column">
+                                        <small class="text-muted">Created</small>
+                                        <strong>{{ request.created_at.strftime('%b %d, %Y') }}</strong>
+                                        {% if request.preferred_date %}
+                                        <small class="text-muted mt-1">Preferred</small>
+                                        <span>{{ request.preferred_date.strftime('%b %d, %Y') }}</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if request.artisan_id %}
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-sm me-2">
+                                            <div class="avatar-circle-sm bg-success">
+                                                <i class="fas fa-user"></i>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <strong>{{ request.assigned_artisan.full_name }}</strong>
+                                            <small class="d-block text-muted">{{ request.assigned_artisan.category }}</small>
+                                        </div>
+                                    </div>
+                                    {% else %}
+                                    <span class="text-muted">Not assigned</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{{ url_for('user_bp.view_request', request_id=request.id) }}" 
+                                           class="btn btn-sm btn-outline-primary" 
+                                           title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        {% if request.status == 'completed' and not request.rating %}
+                                        <button class="btn btn-sm btn-outline-warning give-feedback-btn" 
+                                                data-request-id="{{ request.id }}"
+                                                title="Give Feedback">
+                                            <i class="fas fa-star"></i>
+                                        </button>
+                                        {% endif %}
+                                        {% if request.status in ['pending', 'assigned'] %}
+                                        <button class="btn btn-sm btn-outline-danger cancel-request-btn" 
+                                                data-request-id="{{ request.id }}"
+                                                title="Cancel Request">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Grid View (Hidden by default) -->
+                <div class="d-none p-4" id="gridView">
+                    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                        {% for request in requests %}
+                        <div class="col request-card" 
+                             data-status="{{ request.status }}"
+                             data-date="{{ request.created_at.strftime('%Y-%m-%d') }}"
+                             data-search="{{ request.title|lower }} {{ request.description|lower }}">
+                            <div class="card h-100 hover-shadow">
+                                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                                    <span class="badge bg-{{ 
+                                        'warning' if request.status == 'pending' 
+                                        else 'info' if request.status == 'assigned' 
+                                        else 'primary' if request.status == 'in_progress' 
+                                        else 'success' if request.status == 'completed' 
+                                        else 'danger' 
+                                    }}">
+                                        {{ request.status|replace('_', ' ')|title }}
+                                    </span>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-link text-dark dropdown-toggle" 
+                                                type="button" 
+                                                data-bs-toggle="dropdown">
+                                            <i class="fas fa-ellipsis-v"></i>
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li>
+                                                <a class="dropdown-item" 
+                                                   href="{{ url_for('user_bp.view_request', request_id=request.id) }}">
+                                                    <i class="fas fa-eye me-2"></i>View Details
+                                                </a>
+                                            </li>
+                                            {% if request.status == 'completed' and not request.rating %}
+                                            <li>
+                                                <a class="dropdown-item give-feedback-btn" 
+                                                   href="#"
+                                                   data-request-id="{{ request.id }}">
+                                                    <i class="fas fa-star me-2"></i>Give Feedback
+                                                </a>
+                                            </li>
+                                            {% endif %}
+                                            {% if request.status in ['pending', 'assigned'] %}
+                                            <li>
+                                                <a class="dropdown-item cancel-request-btn" 
+                                                   href="#"
+                                                   data-request-id="{{ request.id }}">
+                                                    <i class="fas fa-times me-2"></i>Cancel Request
+                                                </a>
+                                            </li>
+                                            {% endif %}
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-flex align-items-start mb-3">
+                                        <div class="flex-shrink-0">
+                                            <div class="request-icon-lg">
+                                                <i class="fas fa-{{ request.category.icon|default('tools') }}"></i>
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1 ms-3">
+                                            <h6 class="card-title mb-1">{{ request.title }}</h6>
+                                            <p class="text-muted small mb-2">{{ request.description|truncate(100) }}</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <small class="text-muted d-block mb-1">
+                                            <i class="fas fa-tag me-1"></i>Category
+                                        </small>
+                                        <span class="badge bg-light text-dark">
+                                            {{ request.category.name }}
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <small class="text-muted d-block mb-1">
+                                            <i class="fas fa-map-marker-alt me-1"></i>Location
+                                        </small>
+                                        <span class="small">{{ request.location }}</span>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <small class="text-muted d-block mb-1">
+                                            <i class="fas fa-calendar me-1"></i>Created
+                                        </small>
+                                        <span class="small">{{ request.created_at.strftime('%b %d, %Y') }}</span>
+                                    </div>
+                                    
+                                    {% if request.artisan_id %}
+                                    <div class="mb-3">
+                                        <small class="text-muted d-block mb-1">
+                                            <i class="fas fa-user me-1"></i>Assigned Artisan
+                                        </small>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-xs me-2">
+                                                <div class="avatar-circle-xs bg-success">
+                                                    <i class="fas fa-user"></i>
+                                                </div>
+                                            </div>
+                                            <span class="small">{{ request.assigned_artisan.full_name }}</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if request.preferred_date %}
+                                    <div>
+                                        <small class="text-muted d-block mb-1">
+                                            <i class="fas fa-clock me-1"></i>Preferred Date
+                                        </small>
+                                        <span class="small">{{ request.preferred_date.strftime('%b %d, %Y') }}</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="card-footer bg-white">
+                                    <a href="{{ url_for('user_bp.view_request', request_id=request.id) }}" 
+                                       class="btn btn-sm btn-primary w-100">
+                                        View Details <i class="fas fa-arrow-right ms-1"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Pagination (if needed) -->
+                <div class="card-footer bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="text-muted">
+                            Showing {{ requests|length }} requests
+                        </div>
+                        <!-- Add pagination links here if implementing pagination -->
+                    </div>
+                </div>
+
+            {% else %}
+                <!-- Empty State -->
+                <div class="text-center py-5">
+                    <i class="fas fa-clipboard-list fa-4x text-muted mb-3"></i>
+                    <h4>No service requests yet</h4>
+                    <p class="text-muted mb-4">You haven't submitted any service requests yet</p>
+                    <a href="{{ url_for('user_bp.create_service_request') }}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-plus me-2"></i>Create Your First Request
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Feedback Modal -->
+    <div class="modal fade" id="feedbackModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Rate Service</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="feedbackForm">
+                    <div class="modal-body">
+                        <input type="hidden" id="feedbackRequestId" name="request_id">
+                        
+                        <div class="text-center mb-4">
+                            <h6>How would you rate this service?</h6>
+                            <div class="star-rating mt-3">
+                                {% for i in range(1, 6) %}
+                                <i class="fas fa-star star" data-rating="{{ i }}"></i>
+                                {% endfor %}
+                            </div>
+                            <small class="text-muted mt-2 d-block">Click on a star to rate</small>
+                            <input type="hidden" id="ratingInput" name="rating" value="0" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="feedbackText" class="form-label">Additional Feedback (Optional)</label>
+                            <textarea class="form-control" id="feedbackText" name="feedback" rows="3" 
+                                      placeholder="Share your experience with this service..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="submitFeedbackBtn">
+                            <i class="fas fa-paper-plane me-1"></i>Submit Feedback
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .stat-card {
+        border-radius: 10px;
+        border: none;
+        transition: transform 0.3s;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .request-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        background: rgba(13, 110, 253, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #0d6efd;
+    }
+    
+    .request-icon-lg {
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
+        background: rgba(13, 110, 253, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #0d6efd;
+        font-size: 1.2rem;
+    }
+    
+    .avatar-circle-sm {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.8rem;
+    }
+    
+    .avatar-circle-xs {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.7rem;
+    }
+    
+    .hover-shadow {
+        transition: all 0.3s;
+    }
+    
+    .hover-shadow:hover {
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    
+    .star-rating {
+        font-size: 2rem;
+        color: #ddd;
+        cursor: pointer;
+    }
+    
+    .star-rating .star {
+        margin: 0 2px;
+        transition: color 0.2s;
+    }
+    
+    .star-rating .star:hover,
+    .star-rating .star.hovered,
+    .star-rating .star.selected {
+        color: #ffc107;
+    }
+    
+    .badge {
+        font-weight: 500;
+    }
+    
+    .request-row:hover {
+        background-color: rgba(13, 110, 253, 0.05);
+    }
+    
+    @media (max-width: 768px) {
+        .table-responsive {
+            font-size: 0.9rem;
+        }
+        
+        .btn-group .btn {
+            padding: 0.25rem 0.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // View Toggle
+        const listViewBtn = document.getElementById('listViewBtn');
+        const gridViewBtn = document.getElementById('gridViewBtn');
+        const tableView = document.getElementById('tableView');
+        const gridView = document.getElementById('gridView');
+        
+        if (listViewBtn && gridViewBtn) {
+            listViewBtn.addEventListener('click', function() {
+                tableView.classList.remove('d-none');
+                gridView.classList.add('d-none');
+                listViewBtn.classList.remove('btn-outline-secondary');
+                listViewBtn.classList.add('btn-secondary');
+                gridViewBtn.classList.remove('btn-secondary');
+                gridViewBtn.classList.add('btn-outline-secondary');
+            });
+            
+            gridViewBtn.addEventListener('click', function() {
+                tableView.classList.add('d-none');
+                gridView.classList.remove('d-none');
+                gridViewBtn.classList.remove('btn-outline-secondary');
+                gridViewBtn.classList.add('btn-secondary');
+                listViewBtn.classList.remove('btn-secondary');
+                listViewBtn.classList.add('btn-outline-secondary');
+            });
+        }
+        
+        // Filtering
+        const statusFilter = document.getElementById('statusFilter');
+        const dateFilter = document.getElementById('dateFilter');
+        const searchInput = document.getElementById('searchInput');
+        const searchButton = document.getElementById('searchButton');
+        const requestRows = document.querySelectorAll('.request-row, .request-card');
+        
+        function filterRequests() {
+            const status = statusFilter.value;
+            const dateFilterValue = dateFilter.value;
+            const searchTerm = searchInput.value.toLowerCase();
+            const today = new Date();
+            
+            requestRows.forEach(row => {
+                let show = true;
+                
+                // Status filter
+                if (status !== 'all' && row.dataset.status !== status) {
+                    show = false;
+                }
+                
+                // Date filter
+                if (dateFilterValue !== 'all') {
+                    const requestDate = new Date(row.dataset.date);
+                    
+                    switch(dateFilterValue) {
+                        case 'today':
+                            if (requestDate.toDateString() !== today.toDateString()) show = false;
+                            break;
+                        case 'week':
+                            const oneWeekAgo = new Date();
+                            oneWeekAgo.setDate(today.getDate() - 7);
+                            if (requestDate < oneWeekAgo) show = false;
+                            break;
+                        case 'month':
+                            const oneMonthAgo = new Date();
+                            oneMonthAgo.setMonth(today.getMonth() - 1);
+                            if (requestDate < oneMonthAgo) show = false;
+                            break;
+                    }
+                }
+                
+                // Search filter
+                if (searchTerm && !row.dataset.search.includes(searchTerm)) {
+                    show = false;
+                }
+                
+                if (show) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+        
+        if (statusFilter) statusFilter.addEventListener('change', filterRequests);
+        if (dateFilter) dateFilter.addEventListener('change', filterRequests);
+        if (searchButton) searchButton.addEventListener('click', filterRequests);
+        if (searchInput) {
+            searchInput.addEventListener('keyup', function(e) {
+                if (e.key === 'Enter') filterRequests();
+            });
+        }
+        
+        // Feedback Modal
+        const feedbackModal = new bootstrap.Modal(document.getElementById('feedbackModal'));
+        let currentRating = 0;
+        
+        // Star Rating
+        const stars = document.querySelectorAll('.star');
+        stars.forEach(star => {
+            star.addEventListener('click', function() {
+                const rating = parseInt(this.dataset.rating);
+                currentRating = rating;
+                document.getElementById('ratingInput').value = rating;
+                
+                stars.forEach(s => {
+                    if (parseInt(s.dataset.rating) <= rating) {
+                        s.classList.add('selected');
+                    } else {
+                        s.classList.remove('selected');
+                    }
+                });
+            });
+            
+            star.addEventListener('mouseover', function() {
+                const rating = parseInt(this.dataset.rating);
+                stars.forEach(s => {
+                    if (parseInt(s.dataset.rating) <= rating) {
+                        s.classList.add('hovered');
+                    } else {
+                        s.classList.remove('hovered');
+                    }
+                });
+            });
+            
+            star.addEventListener('mouseout', function() {
+                stars.forEach(s => s.classList.remove('hovered'));
+            });
+        });
+        
+        // Open feedback modal
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.give-feedback-btn')) {
+                const btn = e.target.closest('.give-feedback-btn');
+                const requestId = btn.dataset.requestId;
+                
+                // Reset form
+                document.getElementById('feedbackForm').reset();
+                currentRating = 0;
+                document.getElementById('ratingInput').value = 0;
+                stars.forEach(star => star.classList.remove('selected'));
+                
+                // Set request ID
+                document.getElementById('feedbackRequestId').value = requestId;
+                
+                // Show modal
+                feedbackModal.show();
+            }
+        });
+        
+        // Submit feedback
+        const feedbackForm = document.getElementById('feedbackForm');
+        if (feedbackForm) {
+            feedbackForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this);
+                const submitBtn = document.getElementById('submitFeedbackBtn');
+                const originalBtnText = submitBtn.innerHTML;
+                
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Submitting...';
+                submitBtn.disabled = true;
+                
+                fetch('{{ url_for("user_bp.submit_feedback", request_id="") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        request_id: formData.get('request_id'),
+                        rating: parseInt(formData.get('rating')),
+                        feedback: formData.get('feedback')
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert('Error: ' + data.error);
+                    } else {
+                        feedbackModal.hide();
+                        alert('Thank you for your feedback!');
+                        location.reload();
+                    }
+                })
+                .catch(error => {
+                    alert('Error submitting feedback: ' + error);
+                })
+                .finally(() => {
+                    submitBtn.innerHTML = originalBtnText;
+                    submitBtn.disabled = false;
+                });
+            });
+        }
+        
+        // Cancel request
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.cancel-request-btn')) {
+                const btn = e.target.closest('.cancel-request-btn');
+                const requestId = btn.dataset.requestId;
+                
+                if (confirm('Are you sure you want to cancel this service request?')) {
+                    fetch('{{ url_for("user_bp.cancel_service_request") }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ request_id: requestId })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            alert('Error: ' + data.error);
+                        } else {
+                            alert('Service request cancelled successfully');
+                            location.reload();
+                        }
+                    })
+                    .catch(error => {
+                        alert('Error cancelling request: ' + error);
+                    });
+                }
+            }
+        });
+        
+        // Auto-refresh status every 30 seconds
+        setInterval(function() {
+            fetch('{{ url_for("user_bp.get_service_request", request_id="") }}')
+                .then(response => response.json())
+                .then(data => {
+                    // You could update status badges here without full page reload
+                    console.log('Status refreshed');
+                });
+        }, 30000);
+    });
+</script>
+{% endblock %}

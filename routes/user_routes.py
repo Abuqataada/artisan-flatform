@@ -8,6 +8,20 @@ from forms import LoginForm, UserRegistrationForm
 
 user_bp = Blueprint('user_bp', __name__)
 
+def get_user_stats(user_id):
+    """Get user statistics for dashboard"""
+    total_requests = ServiceRequest.query.filter_by(user_id=user_id).count()
+    pending_requests = ServiceRequest.query.filter_by(user_id=user_id, status='pending').count()
+    in_progress_requests = ServiceRequest.query.filter_by(user_id=user_id, status='in_progress').count()
+    completed_requests = ServiceRequest.query.filter_by(user_id=user_id, status='completed').count()
+    
+    return {
+        'total_requests': total_requests,
+        'pending_requests': pending_requests,
+        'in_progress_requests': in_progress_requests,
+        'completed_requests': completed_requests
+    }
+    
 # Authentication Routes
 @user_bp.route('/register', methods=['GET', 'POST'])
 def register():
@@ -120,26 +134,106 @@ def dashboard():
             return jsonify({'error': 'User access required'}), 403
         else:
             flash('User access required', 'danger')
-            from ..models import Admin, Artisan
             if isinstance(current_user, Admin):
-                return redirect(url_for('admin_bp.dashboard'))
+                return redirect(url_for('admin_bp.admin_dashboard'))
             elif isinstance(current_user, Artisan):
-                return redirect(url_for('artisan_bp.dashboard'))
+                return redirect(url_for('artisan_bp.artisan_dashboard'))
+            return redirect(url_for('main_bp.home'))  # Add a home route or login
     
-    user_requests = ServiceRequest.query.filter_by(user_id=current_user.id)\
-        .order_by(ServiceRequest.created_at.desc()).all()
+    # Get user stats
+    stats = get_user_stats(current_user.id)
     
+    # Get recent requests (last 5)
+    recent_requests = ServiceRequest.query.filter_by(user_id=current_user.id)\
+        .order_by(ServiceRequest.created_at.desc())\
+        .limit(5).all()
+    
+    # Get active categories
     categories = ServiceCategory.query.filter_by(is_active=True).all()
+    
+    # Get unread notifications count
+    unread_notifications = Notification.query.filter_by(
+        user_id=current_user.id,
+        user_type='user',
+        is_read=False
+    ).count()
     
     if request.is_json:
         return jsonify({
             'user': current_user.to_dict(),
-            'service_requests': [req.to_dict() for req in user_requests]
+            'stats': stats,
+            'recent_requests': [req.to_dict() for req in recent_requests]
         })
     else:
         return render_template('user/dashboard.html', 
-                              requests=user_requests,
-                              categories=categories)
+                              stats=stats,
+                              recent_requests=recent_requests,
+                              categories=categories,
+                              unread_notifications=unread_notifications)
+    
+@user_bp.route('/services')
+@login_required
+def services():
+    """View all service categories"""
+    categories = ServiceCategory.query.filter_by(is_active=True).all()
+    return render_template('user/services.html', categories=categories)
+
+@user_bp.route('/request/<request_id>')
+@login_required
+def view_request(request_id):
+    """View a specific service request"""
+    service_request = ServiceRequest.query.get_or_404(request_id)
+    
+    # Ensure user owns this request
+    if service_request.user_id != current_user.id and not isinstance(current_user, Admin):
+        flash('Unauthorized access', 'danger')
+        return redirect(url_for('user_bp.dashboard'))
+    
+    return render_template('user/view_request.html', request=service_request)
+
+@user_bp.route('/completed-requests')
+@login_required
+def completed_requests():
+    """View completed requests for feedback"""
+    completed = ServiceRequest.query.filter_by(
+        user_id=current_user.id,
+        status='completed'
+    ).order_by(ServiceRequest.completed_at.desc()).all()
+    
+    return render_template('user/completed_requests.html', requests=completed)
+
+@user_bp.route('/my-requests')
+@login_required
+def my_requests():
+    """View all user requests"""
+    all_requests = ServiceRequest.query.filter_by(user_id=current_user.id)\
+        .order_by(ServiceRequest.created_at.desc()).all()
+    
+    return render_template('user/my_requests.html', requests=all_requests)
+
+@user_bp.route('/cancel-request', methods=['POST'])
+@login_required
+def cancel_service_request():
+    """Cancel a service request"""
+    data = request.get_json()
+    request_id = data.get('request_id')
+    
+    if not request_id:
+        return jsonify({'error': 'No request ID provided'}), 400
+    
+    service_request = ServiceRequest.query.get_or_404(request_id)
+    
+    # Ensure user owns this request
+    if service_request.user_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    if service_request.status not in ['pending', 'assigned']:
+        return jsonify({'error': 'Cannot cancel request in current status'}), 400
+    
+    service_request.status = 'cancelled'
+    db.session.commit()
+    
+    return jsonify({'message': 'Request cancelled successfully'})
 
 @user_bp.route('/service-request', methods=['GET', 'POST'])
 @login_required
@@ -263,12 +357,26 @@ def get_categories():
     return jsonify({'categories': [cat.to_dict() for cat in categories]})
 
 # Notification Routes
-@user_bp.route('/notifications', methods=['GET'])
+@user_bp.route('/notifications')
 @login_required
 def get_notifications():
+    """Get user notifications"""
     if not isinstance(current_user, User):
         return jsonify({'error': 'User access required'}), 403
     
+    # Check if only count is requested
+    count_only = request.args.get('count_only', 'false').lower() == 'true'
+    
+    if count_only:
+        unread_count = Notification.query.filter_by(
+            user_id=current_user.id,
+            user_type='user',
+            is_read=False
+        ).count()
+        
+        return jsonify({'unread_count': unread_count})
+    
+    # Get all notifications
     notifications = Notification.query.filter_by(
         user_id=current_user.id,
         user_type='user'
@@ -278,7 +386,7 @@ def get_notifications():
         return jsonify({'notifications': [n.to_dict() for n in notifications]})
     else:
         return render_template('user/notifications.html', notifications=notifications)
-
+    
 @user_bp.route('/notifications/<notification_id>/read', methods=['PUT'])
 @login_required
 def mark_notification_read(notification_id):
@@ -329,3 +437,6 @@ def profile():
             'message': 'Profile updated successfully',
             'user': current_user.to_dict()
         })
+    
+
+
