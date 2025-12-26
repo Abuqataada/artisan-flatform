@@ -15,4 +15,4 @@ itsdangerous
 click
 cloudinary
 python-dateutil
-pysycopg2-binary
+psycopg2-binary
