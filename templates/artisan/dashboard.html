@@ -1,0 +1,408 @@
+{% extends "base.html" %}
+
+{% block title %}Artisan Dashboard - Uwaila Global{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Sidebar -->
+    <div class="col-md-3 mb-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <div class="avatar-circle bg-success text-white mb-3 mx-auto">
+                        <i class="fas fa-tools fa-2x"></i>
+                    </div>
+                    <h5 class="card-title">{{ current_user.full_name }}</h5>
+                    <p class="text-muted small">{{ current_user.category }}</p>
+                    
+                    <!-- Verification Badge -->
+                    {% if current_user.is_verified %}
+                    <span class="badge bg-success">
+                        <i class="fas fa-check-circle me-1"></i>Verified
+                    </span>
+                    {% else %}
+                    <span class="badge bg-warning">
+                        <i class="fas fa-clock me-1"></i>Pending Verification
+                    </span>
+                    {% endif %}
+                    
+                    <!-- Availability -->
+                    <div class="mt-3">
+                        <span class="badge bg-{{ 
+                            'success' if current_user.availability == 'available' 
+                            else 'info' if current_user.availability == 'busy' 
+                            else 'secondary' 
+                        }}">
+                            {{ current_user.availability|title }}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="list-group list-group-flush">
+                    <a href="{{ url_for('artisan_bp.artisan_dashboard') }}" class="list-group-item list-group-item-action active">
+                        <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                    </a>
+                    <a href="{{ url_for('artisan_bp.assigned_jobs') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-briefcase me-2"></i>My Jobs
+                        {% if stats.assigned_jobs > 0 %}
+                        <span class="badge bg-info float-end">{{ stats.assigned_jobs }}</span>
+                        {% endif %}
+                    </a>
+                    <a href="{{ url_for('artisan_bp.earnings') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-money-bill-wave me-2"></i>Earnings
+                    </a>
+                    <a href="{{ url_for('artisan_bp.artisan_profile') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-user-cog me-2"></i>Profile
+                    </a>
+                    <a href="{{ url_for('artisan_bp.artisan_portfolio') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-images me-2"></i>Portfolio
+                    </a>
+                    <a href="{{ url_for('artisan_bp.artisan_notifications') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-bell me-2"></i>Notifications
+                        {% if unread_notifications > 0 %}
+                        <span class="badge bg-danger float-end">{{ unread_notifications }}</span>
+                        {% endif %}
+                    </a>
+                </div>
+                
+                <!-- Quick Stats -->
+                <div class="mt-4">
+                    <h6 class="text-muted mb-3">Quick Stats</h6>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Completed Jobs:</span>
+                        <strong>{{ stats.completed_jobs }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Rating:</span>
+                        <strong class="text-warning">
+                            {{ current_user.rating|round(1) if current_user.rating else 'N/A' }}
+                            <i class="fas fa-star"></i>
+                        </strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Total Earnings:</span>
+                        <strong class="text-success">₦{{ stats.total_earnings|default(0)|round(2) }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Update Availability
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-body">
+                <h6 class="card-title mb-3">Update Availability</h6>
+                <form method="POST" action="{{ url_for('artisan_bp.update_availability') }}">
+                    <select class="form-select mb-2" name="status">
+                        <option value="available" {% if current_user.availability == 'available' %}selected{% endif %}>
+                            Available
+                        </option>
+                        <option value="busy" {% if current_user.availability == 'busy' %}selected{% endif %}>
+                            Busy
+                        </option>
+                        <option value="offline" {% if current_user.availability == 'offline' %}selected{% endif %}>
+                            Offline
+                        </option>
+                    </select>
+                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                        <i class="fas fa-sync-alt me-1"></i>Update
+                    </button>
+                </form>
+            </div>
+        </div> -->
+    </div>
+    
+    <!-- Main Content -->
+    <div class="col-md-9">
+        <!-- Welcome Card -->
+        <div class="card border-0 shadow-sm bg-success text-white mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="card-title mb-1">
+                            {% if current_user.is_verified %}
+                            Welcome, {{ current_user.full_name }}!
+                            {% else %}
+                            Account Under Review
+                            {% endif %}
+                        </h4>
+                        <p class="card-text mb-0">
+                            {% if current_user.is_verified %}
+                            You have {{ stats.assigned_jobs }} assigned jobs waiting for your action
+                            {% else %}
+                            Your account is pending admin verification. You'll receive jobs once verified.
+                            {% endif %}
+                        </p>
+                    </div>
+                    {% if current_user.is_verified %}
+                    <a href="{{ url_for('artisan_bp.assigned_jobs') }}" class="btn btn-light">
+                        <i class="fas fa-briefcase me-1"></i>View Jobs
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        {% if current_user.is_verified %}
+        <!-- Quick Actions -->
+        <div class="row mb-4">
+            <div class="col-md-4 mb-3">
+                <div class="card border-0 shadow-sm h-100 text-center p-4 hover-shadow">
+                    <i class="fas fa-briefcase fa-3x text-primary mb-3"></i>
+                    <h5>Assigned Jobs</h5>
+                    <p class="small">View and manage your assigned jobs</p>
+                    <a href="{{ url_for('artisan_bp.assigned_jobs') }}" class="btn btn-outline-primary">
+                        View ({{ stats.assigned_jobs }})
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card border-0 shadow-sm h-100 text-center p-4 hover-shadow">
+                    <i class="fas fa-money-bill-wave fa-3x text-success mb-3"></i>
+                    <h5>Earnings</h5>
+                    <p class="small">Track your earnings and payments</p>
+                    <a href="{{ url_for('artisan_bp.earnings') }}" class="btn btn-outline-success">View Details</a>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card border-0 shadow-sm h-100 text-center p-4 hover-shadow">
+                    <i class="fas fa-chart-line fa-3x text-info mb-3"></i>
+                    <h5>Performance</h5>
+                    <p class="small">Monitor your ratings and reviews</p>
+                    <a href="{{ url_for('artisan_bp.performance') }}" class="btn btn-outline-info">View Stats</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Jobs -->
+        <div class="row">
+            <div class="col-md-8 mb-4">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-0">
+                        <h5 class="card-title mb-0"><i class="fas fa-clock me-2"></i>Recent Jobs</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if recent_jobs %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Job</th>
+                                        <th>Client</th>
+                                        <th>Status</th>
+                                        <th>Date</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for job in recent_jobs %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ job.title|truncate(30) }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ job.category.name }}</small>
+                                        </td>
+                                        <td>{{ job.client.full_name|truncate(20) }}</td>
+                                        <td>
+                                            <span class="badge bg-{{ 
+                                                'info' if job.status == 'assigned' 
+                                                else 'primary' if job.status == 'in_progress' 
+                                                else 'success' if job.status == 'completed' 
+                                                else 'warning' 
+                                            }}">
+                                                {{ job.status|title }}
+                                            </span>
+                                        </td>
+                                        <td>{{ job.created_at.strftime('%m/%d') }}</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{{ url_for('artisan_bp.view_job', job_id=job.id) }}" 
+                                                   class="btn btn-outline-primary">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                {% if job.status == 'assigned' %}
+                                                <a href="{{ url_for('artisan_bp.accept_job', job_id=job.id) }}" 
+                                                   class="btn btn-outline-success">
+                                                    <i class="fas fa-check"></i>
+                                                </a>
+                                                {% elif job.status == 'in_progress' %}
+                                                <a href="{{ url_for('artisan_bp.complete_job', job_id=job.id) }}" 
+                                                   class="btn btn-outline-warning">
+                                                    <i class="fas fa-flag-checkered"></i>
+                                                </a>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="text-center mt-3">
+                            <a href="{{ url_for('artisan_bp.assigned_jobs') }}" class="btn btn-primary">View All Jobs</a>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-briefcase fa-3x text-muted mb-3"></i>
+                            <h5>No jobs assigned yet</h5>
+                            <p class="text-muted">You'll receive job assignments once the admin matches you with clients</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Stats -->
+            <div class="col-md-4 mb-4">
+                <!-- Earnings Summary -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3"><i class="fas fa-money-bill-wave me-2"></i>Earnings Summary</h6>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>This Month:</span>
+                            <strong class="text-success">₦{{ stats.monthly_earnings|default(0)|round(2) }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Last Month:</span>
+                            <strong>₦{{ stats.last_month_earnings|default(0)|round(2) }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>Total:</span>
+                            <strong>₦{{ stats.total_earnings|default(0)|round(2) }}</strong>
+                        </div>
+                        <a href="{{ url_for('artisan_bp.earnings') }}" class="btn btn-outline-success btn-sm w-100">
+                            View Details
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Performance -->
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3"><i class="fas fa-chart-line me-2"></i>Performance</h6>
+                        <div class="text-center mb-3">
+                            <div class="display-4 text-warning">
+                                {{ current_user.rating|round(1) if current_user.rating else 'N/A' }}
+                            </div>
+                            <div class="mb-3">
+                                {% for i in range(5) %}
+                                <i class="fas fa-star {{ 'text-warning' if i < (current_user.rating|round(0)|int) else 'text-muted' }}"></i>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Jobs Completed:</span>
+                            <strong>{{ stats.completed_jobs }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Active Jobs:</span>
+                            <strong class="text-info">{{ stats.active_jobs }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Success Rate:</span>
+                            <strong class="text-success">{{ stats.success_rate|default(0)|round(1) }}%</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Notifications -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-bell me-2"></i>Recent Notifications
+                    {% if unread_notifications > 0 %}
+                    <span class="badge bg-danger">{{ unread_notifications }} unread</span>
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if notifications %}
+                <div class="list-group list-group-flush">
+                    {% for notification in notifications[:5] %}
+                    <div class="list-group-item px-0 {% if not notification.is_read %}bg-light{% endif %}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">{{ notification.title }}</h6>
+                                <p class="mb-1">{{ notification.message }}</p>
+                                <small class="text-muted">{{ notification.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                            </div>
+                            {% if not notification.is_read %}
+                            <form method="POST" action="{{ url_for('artisan_bp.mark_notification_read', notification_id=notification.id) }}">
+                                <button type="submit" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('artisan_bp.artisan_notifications') }}" class="btn btn-outline-primary">View All Notifications</a>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-bell-slash fa-3x text-muted mb-3"></i>
+                    <h5>No notifications</h5>
+                    <p class="text-muted">You're all caught up!</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <!-- Verification Pending Message -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-user-clock fa-4x text-warning mb-4"></i>
+                <h3 class="mb-3">Account Verification Pending</h3>
+                <p class="text-muted mb-4">
+                    Your artisan account is currently under review by our admin team. 
+                    This process typically takes 24-48 hours. Once verified, you'll start 
+                    receiving job assignments from our platform.
+                </p>
+                <div class="row justify-content-center">
+                    <div class="col-md-6">
+                        <div class="alert alert-info">
+                            <h6><i class="fas fa-info-circle me-2"></i>What you can do now:</h6>
+                            <ul class="mb-0">
+                                <li>Complete your profile details</li>
+                                <li>Upload portfolio images</li>
+                                <li>Review service categories</li>
+                                <li>Set your availability</li>
+                            </ul>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <a href="{{ url_for('artisan_bp.artisan_profile') }}" class="btn btn-primary">
+                                <i class="fas fa-user-cog me-1"></i>Complete Profile
+                            </a>
+                            <a href="{{ url_for('artisan_bp.artisan_portfolio') }}" class="btn btn-outline-primary">
+                                <i class="fas fa-images me-1"></i>Upload Portfolio
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% block styles %}
+<style>
+    .avatar-circle {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .hover-shadow:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15)!important;
+        transition: all 0.3s ease;
+    }
+</style>
+{% endblock %}
+
+{% endblock %}

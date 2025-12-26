@@ -1,0 +1,808 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - Uwaila Global{% endblock %}
+
+{% block styles %}
+<style>
+    .profile-header {
+        background: linear-gradient(135deg, #198754 0%, #146c43 100%);
+        color: white;
+        border-radius: 10px 10px 0 0;
+        padding: 30px;
+    }
+    
+    .profile-avatar {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        border: 4px solid white;
+        background: #0d6efd;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        margin: 0 auto 20px;
+    }
+    
+    .verification-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+    
+    .verification-badge.verified {
+        background: #d1e7dd;
+        color: #0f5132;
+    }
+    
+    .verification-badge.pending {
+        background: #fff3cd;
+        color: #664d03;
+    }
+    
+    .profile-section {
+        background: white;
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .profile-section h5 {
+        color: #198754;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .info-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .info-item:last-child {
+        border-bottom: none;
+    }
+    
+    .info-label {
+        color: #6c757d;
+        font-weight: 500;
+    }
+    
+    .info-value {
+        font-weight: 500;
+    }
+    
+    .skills-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+    }
+    
+    .skill-tag {
+        background: #e7f1ff;
+        color: #0d6efd;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+    }
+    
+    .stats-card {
+        text-align: center;
+        padding: 20px;
+        border-radius: 10px;
+        background: #f8f9fa;
+        transition: transform 0.3s ease;
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .stats-number {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #198754;
+        margin: 10px 0;
+    }
+    
+    .edit-button {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+    }
+    
+    .rating-stars {
+        color: #ffc107;
+        font-size: 1.2rem;
+    }
+    
+    .availability-badge {
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-weight: 500;
+    }
+    
+    .availability-badge.available {
+        background: #d1e7dd;
+        color: #0f5132;
+    }
+    
+    .availability-badge.busy {
+        background: #fff3cd;
+        color: #664d03;
+    }
+    
+    .availability-badge.offline {
+        background: #f8d7da;
+        color: #842029;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Sidebar -->
+    <div class="col-md-3 mb-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <div class="avatar-circle bg-success text-white mb-3 mx-auto">
+                        <i class="fas fa-user-cog fa-2x"></i>
+                    </div>
+                    <h5 class="card-title">Profile Settings</h5>
+                    <p class="text-muted small">Manage your account</p>
+                </div>
+                
+                <div class="list-group list-group-flush">
+                    <a href="{{ url_for('artisan_bp.artisan_dashboard') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                    </a>
+                    <a href="{{ url_for('artisan_bp.assigned_jobs') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-briefcase me-2"></i>My Jobs
+                    </a>
+                    <a href="{{ url_for('artisan_bp.earnings') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-money-bill-wave me-2"></i>Earnings
+                    </a>
+                    <a href="{{ url_for('artisan_bp.artisan_profile') }}" class="list-group-item list-group-item-action active">
+                        <i class="fas fa-user-cog me-2"></i>Profile
+                    </a>
+                    <a href="{{ url_for('artisan_bp.artisan_portfolio') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-images me-2"></i>Portfolio
+                    </a>
+                    <a href="{{ url_for('artisan_bp.artisan_notifications') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-bell me-2"></i>Notifications
+                    </a>
+                </div>
+                
+                <!-- Quick Stats -->
+                <div class="mt-4">
+                    <h6 class="text-muted mb-3">Profile Status</h6>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Verification:</span>
+                        {% if current_user.is_verified %}
+                        <span class="verification-badge verified">
+                            <i class="fas fa-check-circle"></i> Verified
+                        </span>
+                        {% else %}
+                        <span class="verification-badge pending">
+                            <i class="fas fa-clock"></i> Pending
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Profile Completion:</span>
+                        <strong class="text-success">{{ profile_completion }}%</strong>
+                    </div>
+                    <div class="progress mb-3" style="height: 8px;">
+                        <div class="progress-bar bg-success" style="width: {{ profile_completion }}%"></div>
+                    </div>
+                    <p class="small text-muted mb-0">
+                        Complete your profile to get more jobs
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-body">
+                <h6 class="card-title mb-3"><i class="fas fa-bolt me-2"></i>Quick Actions</h6>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editProfileModal">
+                        <i class="fas fa-edit me-1"></i>Edit Profile
+                    </button>
+                    <button class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#availabilityModal">
+                        <i class="fas fa-sync-alt me-1"></i>Update Availability
+                    </button>
+                    <a href="{{ url_for('artisan_bp.artisan_portfolio') }}" class="btn btn-outline-info btn-sm">
+                        <i class="fas fa-images me-1"></i>Update Portfolio
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="col-md-9">
+        <!-- Profile Header -->
+        <div class="profile-section">
+            <div class="profile-header text-center">
+                <div class="profile-avatar">
+                    {{ current_user.full_name[0] if current_user.full_name else 'A' }}
+                </div>
+                <h3 class="mb-2">{{ current_user.full_name }}</h3>
+                <div class="d-flex justify-content-center align-items-center gap-3 mb-3">
+                    <span class="badge bg-light text-dark">{{ current_user.category }}</span>
+                    <span class="availability-badge {{ current_user.availability }}">
+                        {{ current_user.availability|title }}
+                    </span>
+                </div>
+                <div class="rating-stars mb-2">
+                    {% for i in range(5) %}
+                    <i class="fas fa-star {{ 'text-warning' if i < (current_user.rating|round(0)|int) else 'text-light' }}"></i>
+                    {% endfor %}
+                    <span class="ms-2">({{ current_user.rating|round(1) if current_user.rating else '0.0' }})</span>
+                </div>
+                <button class="btn btn-light edit-button" data-bs-toggle="modal" data-bs-target="#editProfileModal">
+                    <i class="fas fa-edit"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Stats Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="stats-card">
+                    <i class="fas fa-briefcase fa-2x text-primary mb-2"></i>
+                    <h6>Completed Jobs</h6>
+                    <div class="stats-number">{{ stats.completed_jobs }}</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="stats-card">
+                    <i class="fas fa-money-bill-wave fa-2x text-success mb-2"></i>
+                    <h6>Total Earnings</h6>
+                    <div class="stats-number">₦{{ "{:,.2f}".format(stats.total_earnings) }}</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="stats-card">
+                    <i class="fas fa-star fa-2x text-warning mb-2"></i>
+                    <h6>Average Rating</h6>
+                    <div class="stats-number">{{ current_user.rating|round(1) if current_user.rating else '0.0' }}</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="stats-card">
+                    <i class="fas fa-calendar-alt fa-2x text-info mb-2"></i>
+                    <h6>Experience</h6>
+                    <div class="stats-number">{{ current_user.experience_years }} years</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Personal Information -->
+        <div class="profile-section">
+            <h5><i class="fas fa-user me-2"></i>Personal Information</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="info-item">
+                        <span class="info-label">Full Name:</span>
+                        <span class="info-value">{{ current_user.full_name }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Email:</span>
+                        <span class="info-value">{{ current_user.email }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Phone:</span>
+                        <span class="info-value">{{ current_user.phone }}</span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="info-item">
+                        <span class="info-label">Category:</span>
+                        <span class="info-value">{{ current_user.category }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Experience:</span>
+                        <span class="info-value">{{ current_user.experience_years }} years</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Member Since:</span>
+                        <span class="info-value">{{ current_user.created_at.strftime('%B %d, %Y') }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Professional Details -->
+        <div class="profile-section">
+            <h5><i class="fas fa-briefcase me-2"></i>Professional Details</h5>
+            <div class="info-item">
+                <span class="info-label">Skills:</span>
+                <div class="info-value">
+                    <div class="skills-list">
+                        {% if current_user.skills %}
+                            {% for skill in current_user.skills.split(',') %}
+                            <span class="skill-tag">{{ skill.strip() }}</span>
+                            {% endfor %}
+                        {% else %}
+                            <span class="text-muted">No skills listed</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Credentials:</span>
+                <span class="info-value">
+                    {% if current_user.credentials %}
+                        {{ current_user.credentials }}
+                    {% else %}
+                        <span class="text-muted">No credentials listed</span>
+                    {% endif %}
+                </span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Availability:</span>
+                <span class="info-value">
+                    <span class="availability-badge {{ current_user.availability }}">
+                        {{ current_user.availability|title }}
+                    </span>
+                </span>
+            </div>
+        </div>
+        
+        <!-- Account Settings -->
+        <div class="profile-section">
+            <h5><i class="fas fa-cog me-2"></i>Account Settings</h5>
+            <div class="info-item">
+                <span class="info-label">Account Status:</span>
+                <span class="info-value">
+                    {% if current_user.is_active %}
+                    <span class="badge bg-success">Active</span>
+                    {% else %}
+                    <span class="badge bg-danger">Inactive</span>
+                    {% endif %}
+                </span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Verification Status:</span>
+                <span class="info-value">
+                    {% if current_user.is_verified %}
+                    <span class="verification-badge verified">
+                        <i class="fas fa-check-circle"></i> Verified
+                    </span>
+                    {% else %}
+                    <span class="verification-badge pending">
+                        <i class="fas fa-clock"></i> Pending Verification
+                    </span>
+                    {% endif %}
+                </span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Last Updated:</span>
+                <span class="info-value">{{ current_user.updated_at.strftime('%B %d, %Y %I:%M %p') }}</span>
+            </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="profile-section">
+            <h5><i class="fas fa-tools me-2"></i>Profile Actions</h5>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <button class="btn btn-outline-primary w-100" data-bs-toggle="modal" data-bs-target="#editProfileModal">
+                        <i class="fas fa-edit me-2"></i>Edit Profile
+                    </button>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-outline-success w-100" data-bs-toggle="modal" data-bs-target="#availabilityModal">
+                        <i class="fas fa-sync-alt me-2"></i>Update Availability
+                    </button>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-outline-info w-100" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+                        <i class="fas fa-key me-2"></i>Change Password
+                    </button>
+                </div>
+                <div class="col-md-4">
+                    <a href="{{ url_for('artisan_bp.artisan_portfolio') }}" class="btn btn-outline-warning w-100">
+                        <i class="fas fa-images me-2"></i>Manage Portfolio
+                    </a>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-outline-secondary w-100" data-bs-toggle="modal" data-bs-target="#downloadDataModal">
+                        <i class="fas fa-download me-2"></i>Download Data
+                    </button>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#deactivateModal">
+                        <i class="fas fa-user-slash me-2"></i>Deactivate Account
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Profile Modal -->
+<div class="modal fade" id="editProfileModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit me-2"></i>Edit Profile
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editProfileForm">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="editFullName" class="form-label">Full Name</label>
+                            <input type="text" class="form-control" id="editFullName" 
+                                   value="{{ current_user.full_name }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editPhone" class="form-label">Phone Number</label>
+                            <input type="tel" class="form-control" id="editPhone" 
+                                   value="{{ current_user.phone }}" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="editCategory" class="form-label">Service Category</label>
+                            <select class="form-select" id="editCategory" required>
+                                <option value="">Select category</option>
+                                {% for category in categories %}
+                                <option value="{{ category.name }}" 
+                                        {% if category.name == current_user.category %}selected{% endif %}>
+                                    {{ category.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editExperience" class="form-label">Years of Experience</label>
+                            <input type="number" class="form-control" id="editExperience" 
+                                   min="0" max="50" value="{{ current_user.experience_years }}" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="editSkills" class="form-label">Skills & Specializations</label>
+                        <textarea class="form-control" id="editSkills" rows="3" 
+                                  placeholder="List your skills separated by commas" required>{{ current_user.skills }}</textarea>
+                        <div class="form-text">Example: Plumbing, Pipe Fitting, Water Heater Installation</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="editCredentials" class="form-label">Credentials & Certifications</label>
+                        <textarea class="form-control" id="editCredentials" rows="3" 
+                                  placeholder="List your certifications and qualifications">{{ current_user.credentials or '' }}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Availability Modal -->
+<div class="modal fade" id="availabilityModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-sync-alt me-2"></i>Update Availability
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="availabilityForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Current Status</label>
+                        <div class="alert alert-{{ 
+                            'success' if current_user.availability == 'available' 
+                            else 'warning' if current_user.availability == 'busy' 
+                            else 'danger' 
+                        }}">
+                            <i class="fas fa-{{ 
+                                'check-circle' if current_user.availability == 'available' 
+                                else 'clock' if current_user.availability == 'busy' 
+                                else 'times-circle' 
+                            }} me-2"></i>
+                            {{ current_user.availability|title }}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="newAvailability" class="form-label">Update Status To</label>
+                        <select class="form-select" id="newAvailability" required>
+                            <option value="available" {% if current_user.availability == 'available' %}selected{% endif %}>
+                                Available (Ready for new jobs)
+                            </option>
+                            <option value="busy" {% if current_user.availability == 'busy' %}selected{% endif %}>
+                                Busy (Working on current jobs)
+                            </option>
+                            <option value="offline" {% if current_user.availability == 'offline' %}selected{% endif %}>
+                                Offline (Not available)
+                            </option>
+                        </select>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Your availability status affects whether you receive new job assignments.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Update Status</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Change Password Modal -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-key me-2"></i>Change Password
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="changePasswordForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="currentPassword" class="form-label">Current Password</label>
+                        <input type="password" class="form-control" id="currentPassword" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="newPassword" class="form-label">New Password</label>
+                        <input type="password" class="form-control" id="newPassword" required>
+                        <div class="form-text">Must be at least 8 characters long</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="confirmPassword" class="form-label">Confirm New Password</label>
+                        <input type="password" class="form-control" id="confirmPassword" required>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        You will be logged out after changing your password.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Change Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Deactivate Account Modal -->
+<div class="modal fade" id="deactivateModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Deactivate Account
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <h6 class="alert-heading">Warning!</h6>
+                    <p class="mb-0">This action will temporarily deactivate your account. You can reactivate it anytime by logging in.</p>
+                </div>
+                
+                <div class="mb-3">
+                    <p>What happens when you deactivate:</p>
+                    <ul>
+                        <li>Your profile will be hidden from clients</li>
+                        <li>You won't receive new job assignments</li>
+                        <li>Active jobs will be reassigned</li>
+                        <li>Your data will be preserved</li>
+                        <li>You can reactivate anytime</li>
+                    </ul>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="deactivateReason" class="form-label">Reason for deactivation (optional)</label>
+                    <select class="form-select" id="deactivateReason">
+                        <option value="">Select reason</option>
+                        <option value="taking_break">Taking a break</option>
+                        <option value="seasonal_work">Seasonal work completed</option>
+                        <option value="personal_reasons">Personal reasons</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeactivate">Deactivate Account</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Edit Profile Form
+        const editProfileForm = document.getElementById('editProfileForm');
+        if (editProfileForm) {
+            editProfileForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = {
+                    full_name: document.getElementById('editFullName').value,
+                    phone: document.getElementById('editPhone').value,
+                    category: document.getElementById('editCategory').value,
+                    experience_years: parseInt(document.getElementById('editExperience').value),
+                    skills: document.getElementById('editSkills').value,
+                    credentials: document.getElementById('editCredentials').value
+                };
+                
+                fetch("{{ url_for('artisan_bp.artisan_profile') }}", {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        showAlert('success', data.message);
+                        bootstrap.Modal.getInstance(document.getElementById('editProfileModal')).hide();
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showAlert('danger', data.error || 'Failed to update profile');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAlert('danger', 'Network error. Please try again.');
+                });
+            });
+        }
+        
+        // Availability Form
+        const availabilityForm = document.getElementById('availabilityForm');
+        if (availabilityForm) {
+            availabilityForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const newStatus = document.getElementById('newAvailability').value;
+                
+                fetch("{{ url_for('artisan_bp.update_availability') }}", {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ status: newStatus })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        showAlert('success', data.message);
+                        bootstrap.Modal.getInstance(document.getElementById('availabilityModal')).hide();
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showAlert('danger', data.error || 'Failed to update availability');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAlert('danger', 'Network error. Please try again.');
+                });
+            });
+        }
+        
+        // Change Password Form
+        const changePasswordForm = document.getElementById('changePasswordForm');
+        if (changePasswordForm) {
+            changePasswordForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const currentPassword = document.getElementById('currentPassword').value;
+                const newPassword = document.getElementById('newPassword').value;
+                const confirmPassword = document.getElementById('confirmPassword').value;
+                
+                if (newPassword.length < 8) {
+                    showAlert('danger', 'Password must be at least 8 characters long');
+                    return;
+                }
+                
+                if (newPassword !== confirmPassword) {
+                    showAlert('danger', 'Passwords do not match');
+                    return;
+                }
+                
+                fetch("{{ url_for('artisan_bp.artisan_profile') }}/change-password", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        current_password: currentPassword,
+                        new_password: newPassword
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        showAlert('success', data.message);
+                        bootstrap.Modal.getInstance(document.getElementById('changePasswordModal')).hide();
+                        changePasswordForm.reset();
+                        setTimeout(() => {
+                            window.location.href = "{{ url_for('user_bp.logout') }}";
+                        }, 2000);
+                    } else {
+                        showAlert('danger', data.error || 'Failed to change password');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAlert('danger', 'Network error. Please try again.');
+                });
+            });
+        }
+        
+        // Deactivate Account
+        document.getElementById('confirmDeactivate').addEventListener('click', function() {
+            if (!confirm('Are you sure you want to deactivate your account? This action cannot be undone for 30 days.')) {
+                return;
+            }
+            
+            const reason = document.getElementById('deactivateReason').value;
+            
+            fetch("{{ url_for('artisan_bp.artisan_profile') }}/deactivate", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ reason: reason })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message) {
+                    showAlert('success', data.message);
+                    bootstrap.Modal.getInstance(document.getElementById('deactivateModal')).hide();
+                    setTimeout(() => {
+                        window.location.href = "{{ url_for('user_bp.logout') }}";
+                    }, 2000);
+                } else {
+                    showAlert('danger', data.error || 'Failed to deactivate account');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('danger', 'Network error. Please try again.');
+            });
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Our Services - Uwaila Global{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm mb-5">
+            <div class="card-body p-5">
+                <h1 class="display-5 fw-bold text-center mb-5">Our Services</h1>
+                <p class="lead text-center mb-5">
+                    Discover a wide range of professional services delivered by verified artisans.
+                    All services are managed and quality-controlled by our admin team.
+                </p>
+                
+                <div class="row g-4">
+                    {% for category in categories %}
+                    <div class="col-md-4 col-sm-6">
+                        <div class="card h-100 border-0 shadow-sm hover-shadow">
+                            <div class="card-body text-center p-4">
+                                <div class="mb-3">
+                                    <i class="fas fa-{{ category.icon|default('tools') }} fa-3x text-primary"></i>
+                                </div>
+                                <h4 class="card-title mb-3">{{ category.name }}</h4>
+                                <p class="card-text">{{ category.description|default('Professional service') }}</p>
+                                <a href="{{ url_for('user_bp.create_service_request') }}?category={{ category.id }}" 
+                                   class="btn btn-outline-primary">
+                                    <i class="fas fa-plus-circle me-1"></i>Request Service
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-5">
+                <h2 class="text-center mb-5">How It Works</h2>
+                <div class="row">
+                    <div class="col-md-4 mb-4">
+                        <div class="text-center">
+                            <div class="step-number bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
+                                 style="width: 70px; height: 70px; font-size: 1.5rem;">
+                                1
+                            </div>
+                            <h4>Submit Request</h4>
+                            <p>Fill out our service request form with details about what you need.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-4">
+                        <div class="text-center">
+                            <div class="step-number bg-info text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
+                                 style="width: 70px; height: 70px; font-size: 1.5rem;">
+                                2
+                            </div>
+                            <h4>System Matching</h4>
+                            <p>Our robust system reviews your request and matches you with the best artisan.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-4">
+                        <div class="text-center">
+                            <div class="step-number bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
+                                 style="width: 70px; height: 70px; font-size: 1.5rem;">
+                                3
+                            </div>
+                            <h4>Quality Service</h4>
+                            <p>The artisan completes your job with our quality guarantee.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-5">
+                    <h3 class="mb-4">Ready to Get Started?</h3>
+                    <a href="{{ url_for('user_bp.create_service_request') }}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-plus-circle me-2"></i>Request Service Now
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

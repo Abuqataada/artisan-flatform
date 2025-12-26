@@ -1,0 +1,776 @@
+{% extends "base.html" %}
+
+{% block title %}Portfolio - Uwaila Global{% endblock %}
+
+{% block styles %}
+<style>
+    .portfolio-container {
+        min-height: 500px;
+    }
+    
+    .image-card {
+        position: relative;
+        overflow: hidden;
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        height: 250px;
+    }
+    
+    .image-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+    }
+    
+    .portfolio-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.3s ease;
+    }
+    
+    .image-card:hover .portfolio-image {
+        transform: scale(1.05);
+    }
+    
+    .image-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.7) 100%);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        padding: 15px;
+    }
+    
+    .image-card:hover .image-overlay {
+        opacity: 1;
+    }
+    
+    .image-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+    }
+    
+    .featured-badge {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: #ffc107;
+        color: #000;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: bold;
+    }
+    
+    .upload-area {
+        border: 3px dashed #dee2e6;
+        border-radius: 10px;
+        padding: 40px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: #f8f9fa;
+    }
+    
+    .upload-area:hover {
+        border-color: #0d6efd;
+        background: #e7f1ff;
+    }
+    
+    .upload-area.dragover {
+        border-color: #0d6efd;
+        background: #e7f1ff;
+        transform: scale(1.02);
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+    
+    .empty-state i {
+        font-size: 4rem;
+        margin-bottom: 20px;
+        color: #6c757d;
+    }
+    
+    .image-counter {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+    }
+    
+    .sortable-placeholder {
+        border: 3px dashed #0d6efd;
+        background: #e7f1ff;
+        border-radius: 10px;
+        height: 250px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Sidebar -->
+    <div class="col-md-3 mb-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <div class="avatar-circle bg-success text-white mb-3 mx-auto">
+                        <i class="fas fa-images fa-2x"></i>
+                    </div>
+                    <h5 class="card-title">{{ current_user.full_name }}</h5>
+                    <p class="text-muted small">Portfolio Management</p>
+                </div>
+                
+                <div class="list-group list-group-flush">
+                    <a href="{{ url_for('artisan_bp.artisan_dashboard') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                    </a>
+                    <a href="{{ url_for('artisan_bp.artisan_portfolio') }}" class="list-group-item list-group-item-action active">
+                        <i class="fas fa-images me-2"></i>Portfolio
+                    </a>
+                    <a href="{{ url_for('artisan_bp.artisan_profile') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-user-cog me-2"></i>Profile
+                    </a>
+                    <a href="{{ url_for('artisan_bp.assigned_jobs') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-briefcase me-2"></i>My Jobs
+                    </a>
+                </div>
+                
+                <!-- Portfolio Stats -->
+                <div class="mt-4">
+                    <h6 class="text-muted mb-3">Portfolio Stats</h6>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Total Images:</span>
+                        <strong>{{ portfolio_images|length }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Max Allowed:</span>
+                        <strong>20</strong>
+                    </div>
+                    <div class="progress mb-3" style="height: 8px;">
+                        <div class="progress-bar bg-success" 
+                             style="width: {{ (portfolio_images|length / 20) * 100 }}%"></div>
+                    </div>
+                    <p class="small text-muted mb-0">
+                        Showcase your best work to attract more clients!
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Tips -->
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-body">
+                <h6 class="card-title mb-3"><i class="fas fa-lightbulb me-2"></i>Tips for Great Portfolio</h6>
+                <ul class="small mb-0">
+                    <li>Use high-quality, clear images</li>
+                    <li>Show before/after when possible</li>
+                    <li>Include close-ups of details</li>
+                    <li>Keep images well-lit</li>
+                    <li>Show different types of work</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="col-md-9">
+        <!-- Header -->
+        <div class="card border-0 shadow-sm bg-success text-white mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="card-title mb-1">Your Portfolio</h4>
+                        <p class="card-text mb-0">Showcase your best work to attract clients</p>
+                    </div>
+                    <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                        <i class="fas fa-cloud-upload-alt me-1"></i>Upload Images
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Portfolio Images Grid -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-images me-2"></i>Portfolio Images
+                    <small class="text-muted ms-2">(Drag to reorder - First image is featured)</small>
+                </h5>
+                <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" id="editModeToggle">
+                    <label class="form-check-label" for="editModeToggle">Edit Mode</label>
+                </div>
+            </div>
+            <div class="card-body portfolio-container">
+                {% if portfolio_images %}
+                <div class="row" id="portfolioGrid">
+                    {% for image in portfolio_images %}
+                    <div class="col-md-4 col-sm-6 mb-4" data-image-path="{{ image }}">
+                        <div class="image-card">
+                            {% if loop.first %}
+                            <div class="featured-badge">
+                                <i class="fas fa-star me-1"></i>Featured
+                            </div>
+                            {% endif %}
+                            <div class="image-counter">
+                                {{ loop.index }}
+                            </div>
+                            <img src="{{ url_for('static', filename='uploads/' + image) }}" 
+                                 alt="Portfolio image {{ loop.index }}" 
+                                 class="portfolio-image" 
+                                 onerror="this.src='{{ url_for('static', filename='img/default-portfolio.jpg') }}'">
+                            <div class="image-overlay">
+                                <div class="image-actions">
+                                    <button class="btn btn-sm btn-outline-light view-image" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#imageModal"
+                                            data-image="{{ url_for('static', filename='uploads/' + image) }}">
+                                        <i class="fas fa-expand"></i>
+                                    </button>
+                                    {% if not loop.first %}
+                                    <button class="btn btn-sm btn-warning set-featured" 
+                                            data-image-path="{{ image }}">
+                                        <i class="fas fa-star"></i>
+                                    </button>
+                                    {% endif %}
+                                    <button class="btn btn-sm btn-danger delete-image" 
+                                            data-image-path="{{ image }}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Reorder Instructions -->
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Tip:</strong> Drag and drop images to reorder your portfolio. 
+                    The first image will be shown as your featured work to clients.
+                </div>
+                {% else %}
+                <!-- Empty State -->
+                <div class="empty-state">
+                    <i class="fas fa-images"></i>
+                    <h4>Your portfolio is empty</h4>
+                    <p class="text-muted mb-4">
+                        Upload images of your previous work to showcase your skills to potential clients.
+                    </p>
+                    <button type="button" class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                        <i class="fas fa-cloud-upload-alt me-2"></i>Upload Your First Image
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Portfolio Guidelines -->
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="fas fa-clipboard-list me-2"></i>Portfolio Guidelines</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-check-circle text-success me-2"></i>Do:</h6>
+                        <ul>
+                            <li>Upload clear, well-lit photos</li>
+                            <li>Show different angles of your work</li>
+                            <li>Include before/after photos when possible</li>
+                            <li>Show complex projects you're proud of</li>
+                            <li>Keep file sizes reasonable (max 16MB)</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-times-circle text-danger me-2"></i>Don't:</h6>
+                        <ul>
+                            <li>Upload blurry or dark images</li>
+                            <li>Include personal information in photos</li>
+                            <li>Upload copyrighted material</li>
+                            <li>Exceed 20 image limit</li>
+                            <li>Upload unrelated content</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="uploadModalLabel">
+                    <i class="fas fa-cloud-upload-alt me-2"></i>Upload Portfolio Images
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('artisan_bp.artisan_portfolio') }}" 
+                  enctype="multipart/form-data" id="uploadForm">
+                <div class="modal-body">
+                    <!-- Upload Area -->
+                    <div class="upload-area mb-4" id="dropArea">
+                        <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                        <h5>Drag & Drop Images Here</h5>
+                        <p class="text-muted mb-3">or click to browse</p>
+                        <input type="file" class="d-none" id="fileInput" name="portfolio_images" 
+                               accept="image/*" multiple>
+                        <button type="button" class="btn btn-outline-primary" id="browseButton">
+                            <i class="fas fa-folder-open me-2"></i>Browse Files
+                        </button>
+                        <p class="small text-muted mt-3 mb-0">
+                            Supports JPG, PNG, GIF, WebP (Max 16MB per file)
+                        </p>
+                    </div>
+                    
+                    <!-- Selected Files Preview -->
+                    <div id="filePreview" class="d-none">
+                        <h6 class="mb-3">Selected Files:</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm" id="fileTable">
+                                <thead>
+                                    <tr>
+                                        <th>Preview</th>
+                                        <th>File Name</th>
+                                        <th>Size</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="fileList">
+                                    <!-- Files will be added here -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            You can upload up to {{ 20 - portfolio_images|length }} more images.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="uploadButton" disabled>
+                        <i class="fas fa-upload me-2"></i>Upload Images
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Image Preview Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Image Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="modalImage" src="" alt="Portfolio Image" class="img-fluid rounded">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a id="downloadImage" href="#" class="btn btn-primary" download>
+                    <i class="fas fa-download me-2"></i>Download
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Confirm Deletion
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this image from your portfolio?</p>
+                <p class="text-muted small">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">
+                    <i class="fas fa-trash me-2"></i>Delete Image
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        let imageToDelete = null;
+        
+        // Initialize Sortable for portfolio grid
+        const portfolioGrid = document.getElementById('portfolioGrid');
+        if (portfolioGrid) {
+            const sortable = Sortable.create(portfolioGrid, {
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                dragClass: 'sortable-drag',
+                chosenClass: 'sortable-chosen',
+                onEnd: function(evt) {
+                    // Get new order
+                    const newOrder = Array.from(portfolioGrid.children).map(child => {
+                        return child.getAttribute('data-image-path');
+                    });
+                    
+                    // Send reorder request
+                    fetch("{{ url_for('artisan_bp.reorder_portfolio_images') }}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ order: newOrder })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update image numbers
+                            updateImageNumbers();
+                            showAlert('success', 'Portfolio order updated successfully');
+                        } else {
+                            showAlert('danger', data.error || 'Failed to update order');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showAlert('danger', 'Network error. Please try again.');
+                    });
+                }
+            });
+        }
+        
+        // Update image numbers after reorder
+        function updateImageNumbers() {
+            const counters = document.querySelectorAll('.image-counter');
+            counters.forEach((counter, index) => {
+                counter.textContent = index + 1;
+                
+                // Update featured badge
+                const card = counter.closest('.image-card');
+                const featuredBadge = card.querySelector('.featured-badge');
+                if (index === 0 && !featuredBadge) {
+                    card.innerHTML = '<div class="featured-badge"><i class="fas fa-star me-1"></i>Featured</div>' + 
+                                    card.innerHTML;
+                } else if (index !== 0 && featuredBadge) {
+                    featuredBadge.remove();
+                }
+            });
+        }
+        
+        // Edit mode toggle
+        const editModeToggle = document.getElementById('editModeToggle');
+        if (editModeToggle) {
+            editModeToggle.addEventListener('change', function() {
+                const deleteButtons = document.querySelectorAll('.delete-image');
+                const featuredButtons = document.querySelectorAll('.set-featured');
+                
+                if (this.checked) {
+                    // Show all action buttons
+                    deleteButtons.forEach(btn => btn.style.display = 'inline-block');
+                    featuredButtons.forEach(btn => btn.style.display = 'inline-block');
+                } else {
+                    // Hide action buttons
+                    deleteButtons.forEach(btn => btn.style.display = 'none');
+                    featuredButtons.forEach(btn => btn.style.display = 'none');
+                }
+            });
+        }
+        
+        // View image modal
+        document.querySelectorAll('.view-image').forEach(button => {
+            button.addEventListener('click', function() {
+                const imageUrl = this.getAttribute('data-image');
+                document.getElementById('modalImage').src = imageUrl;
+                document.getElementById('downloadImage').href = imageUrl;
+            });
+        });
+        
+        // Set featured image
+        document.querySelectorAll('.set-featured').forEach(button => {
+            button.addEventListener('click', function() {
+                const imagePath = this.getAttribute('data-image-path');
+                
+                fetch("{{ url_for('artisan_bp.set_featured_image') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ image_path: imagePath })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('success', 'Featured image updated successfully');
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showAlert('danger', data.error || 'Failed to update featured image');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAlert('danger', 'Network error. Please try again.');
+                });
+            });
+        });
+        
+        // Delete image
+        document.querySelectorAll('.delete-image').forEach(button => {
+            button.addEventListener('click', function() {
+                imageToDelete = this.getAttribute('data-image-path');
+                const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+                deleteModal.show();
+            });
+        });
+        
+        // Confirm delete
+        document.getElementById('confirmDelete').addEventListener('click', function() {
+            if (!imageToDelete) return;
+            
+            fetch("{{ url_for('artisan_bp.delete_portfolio_image') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ image_path: imageToDelete })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('success', 'Image deleted successfully');
+                    
+                    // Remove the image card from DOM
+                    const card = document.querySelector(`[data-image-path="${imageToDelete}"]`);
+                    if (card) {
+                        card.remove();
+                    }
+                    
+                    // Update image numbers
+                    updateImageNumbers();
+                    
+                    // Close modal
+                    bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+                    
+                    // Check if portfolio is now empty
+                    if (document.querySelectorAll('#portfolioGrid .col-md-4').length === 0) {
+                        setTimeout(() => location.reload(), 500);
+                    }
+                } else {
+                    showAlert('danger', data.error || 'Failed to delete image');
+                }
+                imageToDelete = null;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('danger', 'Network error. Please try again.');
+                imageToDelete = null;
+            });
+        });
+        
+        // File upload functionality
+        const dropArea = document.getElementById('dropArea');
+        const fileInput = document.getElementById('fileInput');
+        const browseButton = document.getElementById('browseButton');
+        const filePreview = document.getElementById('filePreview');
+        const fileList = document.getElementById('fileList');
+        const uploadButton = document.getElementById('uploadButton');
+        
+        let selectedFiles = [];
+        
+        // Browse button click
+        browseButton.addEventListener('click', () => fileInput.click());
+        
+        // File input change
+        fileInput.addEventListener('change', handleFiles);
+        
+        // Drag and drop events
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, highlight, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, unhighlight, false);
+        });
+        
+        function highlight() {
+            dropArea.classList.add('dragover');
+        }
+        
+        function unhighlight() {
+            dropArea.classList.remove('dragover');
+        }
+        
+        // Handle drop
+        dropArea.addEventListener('drop', handleDrop, false);
+        
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles({ target: { files } });
+        }
+        
+        function handleFiles(e) {
+            const files = Array.from(e.target.files);
+            
+            // Filter and validate files
+            const validFiles = files.filter(file => {
+                const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                const maxSize = 16 * 1024 * 1024; // 16MB
+                
+                if (!validTypes.includes(file.type)) {
+                    showAlert('warning', `File ${file.name} is not a valid image type`);
+                    return false;
+                }
+                
+                if (file.size > maxSize) {
+                    showAlert('warning', `File ${file.name} exceeds 16MB limit`);
+                    return false;
+                }
+                
+                return true;
+            });
+            
+            // Add to selected files
+            selectedFiles = [...selectedFiles, ...validFiles];
+            
+            // Update preview
+            updateFilePreview();
+            
+            // Show preview section
+            filePreview.classList.remove('d-none');
+            
+            // Enable upload button if there are files
+            uploadButton.disabled = selectedFiles.length === 0;
+        }
+        
+        function updateFilePreview() {
+            fileList.innerHTML = '';
+            
+            selectedFiles.forEach((file, index) => {
+                const row = document.createElement('tr');
+                
+                // Create preview thumbnail
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.style.width = '50px';
+                    img.style.height = '50px';
+                    img.style.objectFit = 'cover';
+                    img.style.borderRadius = '5px';
+                    row.cells[0].appendChild(img);
+                };
+                reader.readAsDataURL(file);
+                
+                // File name
+                const nameCell = document.createElement('td');
+                nameCell.textContent = file.name;
+                nameCell.className = 'align-middle';
+                
+                // File size
+                const sizeCell = document.createElement('td');
+                sizeCell.textContent = formatFileSize(file.size);
+                sizeCell.className = 'align-middle';
+                
+                // Remove button
+                const actionCell = document.createElement('td');
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'btn btn-sm btn-danger';
+                removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+                removeBtn.onclick = () => removeFile(index);
+                actionCell.appendChild(removeBtn);
+                actionCell.className = 'align-middle';
+                
+                row.appendChild(document.createElement('td')); // For preview image
+                row.appendChild(nameCell);
+                row.appendChild(sizeCell);
+                row.appendChild(actionCell);
+                
+                fileList.appendChild(row);
+            });
+        }
+        
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            
+            if (selectedFiles.length === 0) {
+                filePreview.classList.add('d-none');
+                uploadButton.disabled = true;
+            }
+            
+            updateFilePreview();
+            
+            // Update file input
+            const dataTransfer = new DataTransfer();
+            selectedFiles.forEach(file => dataTransfer.items.add(file));
+            fileInput.files = dataTransfer.files;
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // Form submission
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            if (selectedFiles.length === 0) {
+                e.preventDefault();
+                showAlert('warning', 'Please select at least one image to upload');
+                return;
+            }
+            
+            // Check if adding these files would exceed the limit
+            const currentCount = {{ portfolio_images|length }};
+            if (currentCount + selectedFiles.length > 20) {
+                e.preventDefault();
+                showAlert('warning', `You can only have 20 images total. You currently have ${currentCount} images.`);
+                return;
+            }
+            
+            // Show loading state
+            uploadButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading...';
+            uploadButton.disabled = true;
+        });
+    });
+</script>
+{% endblock %}

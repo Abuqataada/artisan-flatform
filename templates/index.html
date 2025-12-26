@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Uwaila Global{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section bg-primary text-white py-5 rounded-3 mb-5">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <h1 class="display-4 fw-bold mb-4">Find Trusted Artisans for Every Service Need</h1>
+                <p class="lead mb-4">Connecting skilled professionals with clients through a secure and managed platform. Quality service guaranteed with admin-controlled matching.</p>
+                <div class="d-flex gap-3">
+                    <a href="{{ url_for('user_bp.register') }}" class="btn btn-light btn-lg px-4">
+                        <i class="fas fa-user-plus me-2"></i>Request Service
+                    </a>
+                    <a href="{{ url_for('artisan_bp.register') }}" class="btn btn-outline-light btn-lg px-4">
+                        <i class="fas fa-tools me-2"></i>Join as Artisan
+                    </a>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <img src="{{ url_for('static', filename='images/artisan.jpg') }}" alt="Artisans at work" class="img-fluid">
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- How It Works -->
+<section class="how-it-works py-5">
+    <div class="container">
+        <h2 class="text-center mb-5">How It Works</h2>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm text-center p-4">
+                    <div class="card-icon mb-3">
+                        <i class="fas fa-clipboard-list fa-3x text-primary"></i>
+                    </div>
+                    <h4 class="card-title">1. Submit Request</h4>
+                    <p class="card-text">Describe your service need through our secure form. Provide details about the job requirements and preferred timeline.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm text-center p-4">
+                    <div class="card-icon mb-3">
+                        <i class="fas fa-user-shield fa-3x text-primary"></i>
+                    </div>
+                    <h4 class="card-title">2. Admin Matches</h4>
+                    <p class="card-text">Our admin team reviews your request and matches you with the most suitable verified artisan based on skills and availability.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm text-center p-4">
+                    <div class="card-icon mb-3">
+                        <i class="fas fa-hands-helping fa-3x text-primary"></i>
+                    </div>
+                    <h4 class="card-title">3. Get Service</h4>
+                    <p class="card-text">The assigned artisan completes your job with quality assurance. You provide feedback upon completion.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Service Categories -->
+<section class="service-categories bg-light py-5">
+    <div class="container">
+        <h2 class="text-center mb-5">Service Categories</h2>
+        <div class="row g-4">
+            {% for category in categories %}
+            <div class="col-md-3 col-sm-6">
+                <div class="card h-100 border-0 shadow-sm hover-shadow text-center p-3">
+                    <div class="card-icon mb-3">
+                        <i class="fas fa-{{ category.icon|default('tools') }} fa-2x text-primary"></i>
+                    </div>
+                    <h5 class="card-title">{{ category.name }}</h5>
+                    <p class="card-text small">{{ category.description|default('Professional service') }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- Why Choose Us -->
+<section class="why-choose-us py-5">
+    <div class="container">
+        <h2 class="text-center mb-5">Why Choose Uwaila Global</h2>
+        <div class="row g-4">
+            <div class="col-lg-3 col-md-6">
+                <div class="d-flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-shield-alt fa-2x text-success"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h5>Verified Artisans</h5>
+                        <p class="mb-0">All artisans are thoroughly vetted and verified by our admin team.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="d-flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-lock fa-2x text-success"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h5>Secure Platform</h5>
+                        <p class="mb-0">Admin-controlled matching ensures secure and reliable service delivery.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="d-flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-star fa-2x text-success"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h5>Quality Guarantee</h5>
+                        <p class="mb-0">We ensure quality service through our rating and feedback system.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="d-flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-headset fa-2x text-success"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h5>24/7 Support</h5>
+                        <p class="mb-0">Our admin team is always available to assist with any concerns.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="cta-section bg-primary text-white py-5 rounded-3 mt-5">
+    <div class="container text-center">
+        <h2 class="mb-4">Ready to Get Started?</h2>
+        <p class="lead mb-4">Join thousands of satisfied customers and skilled artisans on our platform.</p>
+        <div class="d-flex justify-content-center gap-3 flex-wrap">
+            <a href="{{ url_for('user_bp.register') }}" class="btn btn-light btn-lg px-4">
+                <i class="fas fa-play-circle me-2"></i>Request Service Now
+            </a>
+            <a href="{{ url_for('artisan_bp.register') }}" class="btn btn-outline-light btn-lg px-4">
+                <i class="fas fa-user-tie me-2"></i>Become an Artisan
+            </a>
+        </div>
+    </div>
+</section>
+{% endblock %}

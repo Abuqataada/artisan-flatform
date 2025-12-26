@@ -7,3 +7,9 @@ Flask-CORS
 python-dotenv
 email-validator
 Werkzeug
+Pillow
+Jinja2
+MarkupSafe
+SQLAlchemy
+itsdangerous
+click

@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}About Us - Uwaila Global{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-5">
+                <h1 class="display-5 fw-bold text-center mb-5">About Uwaila Global</h1>
+                
+                <div class="mb-5">
+                    <h3 class="mb-3">Our Mission</h3>
+                    <p class="lead">
+                        To bridge the gap between service seekers and skilled artisans through a trusted, 
+                        secure, and efficient platform that ensures quality service delivery.
+                    </p>
+                </div>
+                
+                <div class="mb-5">
+                    <h3 class="mb-3">Our Vision</h3>
+                    <p class="lead">
+                        To become the leading artisan service platform in Nigeria, revolutionizing how 
+                        people connect with skilled professionals while maintaining the highest standards 
+                        of quality and trust.
+                    </p>
+                </div>
+                
+                <div class="mb-5">
+                    <h3 class="mb-3">Why Choose Us?</h3>
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <div class="d-flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-shield-alt fa-2x text-primary"></i>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <h5>Verified Artisans</h5>
+                                    <p>All artisans undergo thorough verification and background checks.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-user-shield fa-2x text-primary"></i>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <h5>Admin-Controlled Matching</h5>
+                                    <p>Every service request is manually reviewed and matched by our admin team.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-star fa-2x text-primary"></i>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <h5>Quality Assurance</h5>
+                                    <p>We ensure quality service through ratings and feedback system.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-lock fa-2x text-primary"></i>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <h5>Secure Platform</h5>
+                                    <p>Your data and transactions are protected with advanced security measures.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-5">
+                    <h3 class="mb-3">How We Work</h3>
+                    <div class="row">
+                        <div class="col-md-4 mb-4">
+                            <div class="text-center p-3">
+                                <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
+                                     style="width: 60px; height: 60px;">
+                                    <i class="fas fa-clipboard-list"></i>
+                                </div>
+                                <h5>Submit Request</h5>
+                                <p>Clients describe their service needs through our secure platform.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-4">
+                            <div class="text-center p-3">
+                                <div class="bg-info text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
+                                     style="width: 60px; height: 60px;">
+                                    <i class="fas fa-user-shield"></i>
+                                </div>
+                                <h5>Admin Review</h5>
+                                <p>Our admin team reviews and matches with the best artisan.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-4">
+                            <div class="text-center p-3">
+                                <div class="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
+                                     style="width: 60px; height: 60px;">
+                                    <i class="fas fa-hands-helping"></i>
+                                </div>
+                                <h5>Service Delivery</h5>
+                                <p>Artisan completes the job with quality assurance.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center">
+                    <h3 class="mb-4">Join Our Community</h3>
+                    <p class="lead mb-4">
+                        Whether you need a service or you're a skilled artisan looking for opportunities, 
+                        Uwaila Global is the perfect platform for you.
+                    </p>
+                    <div class="d-flex gap-3 justify-content-center">
+                        <a href="{{ url_for('user_bp.register') }}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-user-plus me-2"></i>Register as Client
+                        </a>
+                        <a href="{{ url_for('artisan_bp.register') }}" class="btn btn-success btn-lg">
+                            <i class="fas fa-tools me-2"></i>Join as Artisan
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

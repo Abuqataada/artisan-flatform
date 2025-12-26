@@ -1,0 +1,718 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications - Uwaila Global{% endblock %}
+
+{% block styles %}
+<style>
+    .notification-item {
+        padding: 20px;
+        border-bottom: 1px solid #e9ecef;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+    
+    .notification-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .notification-item.unread {
+        background-color: #e7f1ff;
+        border-left: 4px solid #0d6efd;
+    }
+    
+    .notification-item:last-child {
+        border-bottom: none;
+    }
+    
+    .notification-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        margin-right: 15px;
+    }
+    
+    .notification-icon.info {
+        background: #e7f1ff;
+        color: #0d6efd;
+    }
+    
+    .notification-icon.success {
+        background: #d1e7dd;
+        color: #198754;
+    }
+    
+    .notification-icon.warning {
+        background: #fff3cd;
+        color: #ffc107;
+    }
+    
+    .notification-icon.danger {
+        background: #f8d7da;
+        color: #dc3545;
+    }
+    
+    .notification-time {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+    
+    .notification-actions {
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .notification-item:hover .notification-actions {
+        opacity: 1;
+    }
+    
+    .filter-buttons .btn {
+        border-radius: 20px;
+        padding: 5px 15px;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+    
+    .empty-state i {
+        font-size: 4rem;
+        margin-bottom: 20px;
+        color: #6c757d;
+    }
+    
+    .notification-badge {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #dc3545;
+    }
+    
+    .notification-type {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        margin-bottom: 5px;
+    }
+    
+    .notification-type.job {
+        background: #e7f1ff;
+        color: #0d6efd;
+    }
+    
+    .notification-type.system {
+        background: #e2e3e5;
+        color: #6c757d;
+    }
+    
+    .notification-type.payment {
+        background: #d1e7dd;
+        color: #198754;
+    }
+    
+    .notification-type.alert {
+        background: #fff3cd;
+        color: #664d03;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Sidebar -->
+    <div class="col-md-3 mb-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <div class="avatar-circle bg-success text-white mb-3 mx-auto">
+                        <i class="fas fa-bell fa-2x"></i>
+                    </div>
+                    <h5 class="card-title">{{ current_user.full_name }}</h5>
+                    <p class="text-muted small">{{ current_user.category }}</p>
+                </div>
+                
+                <div class="list-group list-group-flush">
+                    <a href="{{ url_for('artisan_bp.artisan_dashboard') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                    </a>
+                    <a href="{{ url_for('artisan_bp.assigned_jobs') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-briefcase me-2"></i>My Jobs
+                    </a>
+                    <a href="{{ url_for('artisan_bp.earnings') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-money-bill-wave me-2"></i>Earnings
+                    </a>
+                    <a href="{{ url_for('artisan_bp.artisan_profile') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-user-cog me-2"></i>Profile
+                    </a>
+                    <a href="{{ url_for('artisan_bp.artisan_notifications') }}" class="list-group-item list-group-item-action active">
+                        <i class="fas fa-bell me-2"></i>Notifications
+                        {% if unread_count > 0 %}
+                        <span class="badge bg-danger float-end">{{ unread_count }}</span>
+                        {% endif %}
+                    </a>
+                </div>
+                
+                <!-- Notification Stats -->
+                <div class="mt-4">
+                    <h6 class="text-muted mb-3">Notification Stats</h6>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Unread:</span>
+                        <strong class="text-primary">{{ unread_count }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Total:</span>
+                        <strong>{{ total_count }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3">
+                        <span>This Month:</span>
+                        <strong>{{ this_month_count }}</strong>
+                    </div>
+                    <div class="progress mb-3" style="height: 8px;">
+                        <div class="progress-bar bg-primary" 
+                             style="width: {{ (unread_count / total_count * 100) if total_count > 0 else 0 }}%"></div>
+                    </div>
+                    <p class="small text-muted mb-0">
+                        Stay updated with job assignments and important alerts
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Notification Settings -->
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-body">
+                <h6 class="card-title mb-3"><i class="fas fa-cog me-2"></i>Settings</h6>
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="emailNotifications" checked>
+                    <label class="form-check-label" for="emailNotifications">Email Notifications</label>
+                </div>
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="jobAlerts" checked>
+                    <label class="form-check-label" for="jobAlerts">Job Alerts</label>
+                </div>
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="paymentAlerts" checked>
+                    <label class="form-check-label" for="paymentAlerts">Payment Alerts</label>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="systemUpdates" checked>
+                    <label class="form-check-label" for="systemUpdates">System Updates</label>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="col-md-9">
+        <!-- Header -->
+        <div class="card border-0 shadow-sm bg-success text-white mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="card-title mb-1">Notifications</h4>
+                        <p class="card-text mb-0">
+                            {% if unread_count > 0 %}
+                            You have {{ unread_count }} unread notification{{ 's' if unread_count > 1 else '' }}
+                            {% else %}
+                            You're all caught up!
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item" href="#" id="markAllRead">
+                                    <i class="fas fa-check-double me-2"></i>Mark All as Read
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="#" id="deleteAllRead">
+                                    <i class="fas fa-trash me-2"></i>Delete All Read
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="#">
+                                    <i class="fas fa-cog me-2"></i>Notification Settings
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Filter Buttons -->
+        <div class="mb-4">
+            <div class="filter-buttons d-flex gap-2 flex-wrap">
+                <a href="{{ url_for('artisan_bp.artisan_notifications') }}" 
+                   class="btn btn-{{ 'primary' if not filter_type else 'outline-primary' }}">
+                    All Notifications
+                </a>
+                <a href="{{ url_for('artisan_bp.artisan_notifications', filter='unread') }}" 
+                   class="btn btn-{{ 'info' if filter_type == 'unread' else 'outline-info' }}">
+                    Unread <span class="badge bg-dark">{{ unread_count }}</span>
+                </a>
+                <a href="{{ url_for('artisan_bp.artisan_notifications', filter='job') }}" 
+                   class="btn btn-{{ 'warning' if filter_type == 'job' else 'outline-warning' }}">
+                    Job Related
+                </a>
+                <a href="{{ url_for('artisan_bp.artisan_notifications', filter='payment') }}" 
+                   class="btn btn-{{ 'success' if filter_type == 'payment' else 'outline-success' }}">
+                    Payments
+                </a>
+                <a href="{{ url_for('artisan_bp.artisan_notifications', filter='system') }}" 
+                   class="btn btn-{{ 'secondary' if filter_type == 'system' else 'outline-secondary' }}">
+                    System
+                </a>
+            </div>
+        </div>
+        
+        <!-- Notifications List -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                {% if notifications %}
+                <div class="list-group list-group-flush">
+                    {% for notification in notifications %}
+                    <div class="notification-item {% if not notification.is_read %}unread{% endif %}">
+                        {% if not notification.is_read %}
+                        <span class="notification-badge"></span>
+                        {% endif %}
+                        
+                        <div class="d-flex">
+                            <!-- Notification Icon -->
+                            <div class="notification-icon {{ 
+                                'success' if notification.notification_type in ['job_assigned', 'payment_received', 'account_verified']
+                                else 'warning' if notification.notification_type in ['job_issue', 'payment_pending']
+                                else 'danger' if notification.notification_type in ['job_cancelled', 'account_deactivated']
+                                else 'info'
+                            }}">
+                                <i class="fas fa-{{ 
+                                    'briefcase' if 'job' in notification.notification_type
+                                    else 'money-bill-wave' if 'payment' in notification.notification_type
+                                    else 'check-circle' if 'verified' in notification.notification_type
+                                    else 'exclamation-triangle' if 'issue' in notification.notification_type
+                                    else 'bell'
+                                }}"></i>
+                            </div>
+                            
+                            <!-- Notification Content -->
+                            <div class="flex-grow-1">
+                                <span class="notification-type {{ 
+                                    'job' if 'job' in notification.notification_type
+                                    else 'payment' if 'payment' in notification.notification_type
+                                    else 'system' if 'system' in notification.notification_type
+                                    else 'alert'
+                                }}">
+                                    {{ notification.notification_type|replace('_', ' ')|title }}
+                                </span>
+                                
+                                <h6 class="mb-1">{{ notification.title }}</h6>
+                                <p class="mb-2">{{ notification.message }}</p>
+                                
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="notification-time">
+                                        <i class="far fa-clock me-1"></i>
+                                        {{ notification.created_at|relative_time }}
+                                    </small>
+                                    
+                                    <div class="notification-actions">
+                                        {% if not notification.is_read %}
+                                        <button class="btn btn-sm btn-outline-primary mark-read" 
+                                                data-notification-id="{{ notification.id }}">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                        {% endif %}
+                                        <button class="btn btn-sm btn-outline-danger delete-notification" 
+                                                data-notification-id="{{ notification.id }}">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                {% if notification.related_id %}
+                                <div class="mt-2">
+                                    <a href="#" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-external-link-alt me-1"></i>View Details
+                                    </a>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Load More -->
+                {% if has_more %}
+                <div class="text-center py-3">
+                    <button class="btn btn-outline-primary" id="loadMoreNotifications">
+                        <i class="fas fa-sync-alt me-2"></i>Load More
+                    </button>
+                </div>
+                {% endif %}
+                
+                <!-- Pagination -->
+                {% if total_pages > 1 %}
+                <nav class="px-3 py-3">
+                    <ul class="pagination justify-content-center mb-0">
+                        {% if page > 1 %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('artisan_bp.artisan_notifications', filter=filter_type, page=page-1) }}">
+                                Previous
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for p in range(1, total_pages + 1) %}
+                        <li class="page-item {% if p == page %}active{% endif %}">
+                            <a class="page-link" href="{{ url_for('artisan_bp.artisan_notifications', filter=filter_type, page=p) }}">
+                                {{ p }}
+                            </a>
+                        </li>
+                        {% endfor %}
+                        
+                        {% if page < total_pages %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('artisan_bp.artisan_notifications', filter=filter_type, page=page+1) }}">
+                                Next
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+                
+                {% else %}
+                <!-- Empty State -->
+                <div class="empty-state">
+                    <i class="fas fa-bell-slash"></i>
+                    <h4>No notifications</h4>
+                    <p class="text-muted mb-4">
+                        {% if filter_type == 'unread' %}
+                        You don't have any unread notifications
+                        {% elif filter_type %}
+                        No {{ filter_type }} notifications found
+                        {% else %}
+                        You're all caught up! No notifications at the moment.
+                        {% endif %}
+                    </p>
+                    <div class="d-flex gap-3 justify-content-center">
+                        <a href="{{ url_for('artisan_bp.artisan_notifications') }}" class="btn btn-outline-primary">
+                            View All Notifications
+                        </a>
+                        <a href="{{ url_for('artisan_bp.artisan_dashboard') }}" class="btn btn-primary">
+                            <i class="fas fa-tachometer-alt me-1"></i>Go to Dashboard
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Notification Preferences -->
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="fas fa-sliders-h me-2"></i>Notification Preferences</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="newJobNotifications" checked>
+                            <label class="form-check-label" for="newJobNotifications">
+                                New Job Assignments
+                            </label>
+                            <div class="form-text">Get notified when you're assigned a new job</div>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="jobUpdates" checked>
+                            <label class="form-check-label" for="jobUpdates">
+                                Job Status Updates
+                            </label>
+                            <div class="form-text">Updates on job progress and completion</div>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="paymentNotifications" checked>
+                            <label class="form-check-label" for="paymentNotifications">
+                                Payment Notifications
+                            </label>
+                            <div class="form-text">Alerts for payments and withdrawals</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="ratingNotifications" checked>
+                            <label class="form-check-label" for="ratingNotifications">
+                                Rating & Review Alerts
+                            </label>
+                            <div class="form-text">Get notified when clients rate your work</div>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="systemAnnouncements" checked>
+                            <label class="form-check-label" for="systemAnnouncements">
+                                System Announcements
+                            </label>
+                            <div class="form-text">Important updates from Uwaila Global</div>
+                        </div>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="marketingEmails">
+                            <label class="form-check-label" for="marketingEmails">
+                                Marketing Emails
+                            </label>
+                            <div class="form-text">Tips, promotions, and platform updates</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <button class="btn btn-primary" id="savePreferences">
+                        <i class="fas fa-save me-2"></i>Save Preferences
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Mark notification as read
+        document.querySelectorAll('.mark-read').forEach(button => {
+            button.addEventListener('click', function() {
+                const notificationId = this.getAttribute('data-notification-id');
+                const url = `/artisan/notifications/${notificationId}/read`;
+                
+                fetch(url, {
+                    method: 'PUT',
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        // Remove unread badge and update count
+                        const notificationItem = this.closest('.notification-item');
+                        notificationItem.classList.remove('unread');
+                        
+                        const badge = notificationItem.querySelector('.notification-badge');
+                        if (badge) {
+                            badge.remove();
+                        }
+                        
+                        // Hide the mark read button
+                        this.remove();
+                        
+                        // Update unread count
+                        updateUnreadCount(-1);
+                        
+                        showAlert('success', 'Notification marked as read');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAlert('danger', 'Network error. Please try again.');
+                });
+            });
+        });
+        
+        // Delete notification
+        document.querySelectorAll('.delete-notification').forEach(button => {
+            button.addEventListener('click', function() {
+                const notificationId = this.getAttribute('data-notification-id');
+                const notificationItem = this.closest('.notification-item');
+                
+                if (!confirm('Are you sure you want to delete this notification?')) {
+                    return;
+                }
+                
+                fetch("{{ url_for('artisan_bp.artisan_notifications') }}/delete/" + notificationId, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Remove from DOM
+                        notificationItem.remove();
+                        
+                        // Update counts
+                        if (notificationItem.classList.contains('unread')) {
+                            updateUnreadCount(-1);
+                        }
+                        updateTotalCount(-1);
+                        
+                        showAlert('success', 'Notification deleted');
+                        
+                        // Check if list is now empty
+                        if (document.querySelectorAll('.notification-item').length === 0) {
+                            setTimeout(() => location.reload(), 500);
+                        }
+                    } else {
+                        showAlert('danger', data.error || 'Failed to delete notification');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAlert('danger', 'Network error. Please try again.');
+                });
+            });
+        });
+        
+        // Mark all as read
+        document.getElementById('markAllRead').addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            if (!confirm('Mark all notifications as read?')) {
+                return;
+            }
+            
+            fetch("{{ url_for('artisan_bp.artisan_notifications') }}/mark-all-read", {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove all unread badges
+                    document.querySelectorAll('.notification-item.unread').forEach(item => {
+                        item.classList.remove('unread');
+                        const badge = item.querySelector('.notification-badge');
+                        if (badge) {
+                            badge.remove();
+                        }
+                        
+                        // Hide mark read buttons
+                        const markReadBtn = item.querySelector('.mark-read');
+                        if (markReadBtn) {
+                            markReadBtn.remove();
+                        }
+                    });
+                    
+                    // Reset unread count
+                    updateUnreadCount(-{{ unread_count }});
+                    
+                    showAlert('success', 'All notifications marked as read');
+                } else {
+                    showAlert('danger', data.error || 'Failed to mark all as read');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('danger', 'Network error. Please try again.');
+            });
+        });
+        
+        // Delete all read
+        document.getElementById('deleteAllRead').addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            if (!confirm('Delete all read notifications? This action cannot be undone.')) {
+                return;
+            }
+            
+            fetch("{{ url_for('artisan_bp.artisan_notifications') }}/delete-all-read", {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove all read notifications
+                    document.querySelectorAll('.notification-item:not(.unread)').forEach(item => {
+                        item.remove();
+                    });
+                    
+                    // Update total count
+                    const readCount = {{ total_count }} - {{ unread_count }};
+                    updateTotalCount(-readCount);
+                    
+                    showAlert('success', 'All read notifications deleted');
+                    
+                    // Check if list is now empty
+                    if (document.querySelectorAll('.notification-item').length === 0) {
+                        setTimeout(() => location.reload(), 500);
+                    }
+                } else {
+                    showAlert('danger', data.error || 'Failed to delete read notifications');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('danger', 'Network error. Please try again.');
+            });
+        });
+        
+        // Save preferences
+        document.getElementById('savePreferences').addEventListener('click', function() {
+            const preferences = {
+                email_notifications: document.getElementById('emailNotifications').checked,
+                job_alerts: document.getElementById('jobAlerts').checked,
+                payment_alerts: document.getElementById('paymentAlerts').checked,
+                system_updates: document.getElementById('systemUpdates').checked,
+                new_job_notifications: document.getElementById('newJobNotifications').checked,
+                job_updates: document.getElementById('jobUpdates').checked,
+                payment_notifications: document.getElementById('paymentNotifications').checked,
+                rating_notifications: document.getElementById('ratingNotifications').checked,
+                system_announcements: document.getElementById('systemAnnouncements').checked,
+                marketing_emails: document.getElementById('marketingEmails').checked
+            };
+            
+            fetch("{{ url_for('artisan_bp.artisan_notifications') }}/preferences", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(preferences)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('success', 'Preferences saved successfully');
+                } else {
+                    showAlert('danger', data.error || 'Failed to save preferences');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('danger', 'Network error. Please try again.');
+            });
+        });
+        
+        // Load more notifications
+        document.getElementById('loadMoreNotifications')?.addEventListener('click', function() {
+            const nextPage = {{ page }} + 1;
+            window.location.href = "{{ url_for('artisan_bp.artisan_notifications', filter=filter_type) }}" + "&page=" + nextPage;
+        });
+        
+        // Helper functions
+        function updateUnreadCount(change) {
+            const unreadCountEl = document.querySelectorAll('.badge.bg-danger');
+            unreadCountEl.forEach(el => {
+                const currentCount = parseInt(el.textContent);
+                const newCount = Math.max(0, currentCount + change);
+                el.textContent = newCount;
+                
+                if (newCount === 0) {
+                    el.remove();
+                }
+            });
+        }
+        
+        function updateTotalCount(change) {
+            // This would update a total count display if you had one
+            console.log('Total count changed by:', change);
+        }
+    });
+</script>
+{% endblock %}

@@ -1,31 +1,37 @@
 from flask import Blueprint, request, jsonify, render_template
 from flask_login import login_required, current_user
-from werkzeug.security import generate_password_hash
-from ..models import db, Admin, User, Artisan, ServiceRequest, ServiceCategory, Notification
-from datetime import datetime
+from functools import wraps
+from models import db, Admin, User, Artisan, ServiceRequest, ServiceCategory, Notification
+from datetime import datetime, timedelta
 import json
 
-admin_bp = Blueprint('admin_routes', __name__)
+admin_bp = Blueprint('admin_bp', __name__)
 
 # Admin Authentication Middleware
 def admin_required(f):
+    @wraps(f)
     @login_required
-    def decorated_function(*args, **kwargs):
+    def decorated(*args, **kwargs):
         if not isinstance(current_user, Admin):
-            return jsonify({'error': 'Admin access required'}), 403
+            if request.is_json:
+                return jsonify({'error': 'Admin access required'}), 403
+            else:
+                return render_template('error.html', message='Admin access required'), 403
         return f(*args, **kwargs)
-    return decorated_function
+    return decorated
 
 # Dashboard Routes
 @admin_bp.route('/dashboard')
 @admin_required
-def dashboard():
+def admin_dashboard():
     # Get statistics
     total_users = User.query.count()
     total_artisans = Artisan.query.count()
     total_requests = ServiceRequest.query.count()
     pending_requests = ServiceRequest.query.filter_by(status='pending').count()
     active_requests = ServiceRequest.query.filter_by(status='in_progress').count()
+    completed_requests = ServiceRequest.query.filter_by(status='completed').count()
+    pending_verifications = Artisan.query.filter_by(is_verified=False).count()
     
     # Recent requests
     recent_requests = ServiceRequest.query\
@@ -33,23 +39,49 @@ def dashboard():
         .limit(10)\
         .all()
     
-    return jsonify({
-        'stats': {
-            'total_users': total_users,
-            'total_artisans': total_artisans,
-            'total_requests': total_requests,
-            'pending_requests': pending_requests,
-            'active_requests': active_requests
-        },
-        'recent_requests': [req.to_dict() for req in recent_requests]
-    })
+    # Pending verifications
+    pending_artisans = Artisan.query.filter_by(is_verified=False)\
+        .order_by(Artisan.created_at.desc())\
+        .limit(5)\
+        .all()
+    
+    if request.is_json:
+        return jsonify({
+            'stats': {
+                'total_users': total_users,
+                'total_artisans': total_artisans,
+                'total_requests': total_requests,
+                'pending_requests': pending_requests,
+                'active_requests': active_requests,
+                'completed_requests': completed_requests,
+                'pending_verifications': pending_verifications
+            },
+            'recent_requests': [req.to_dict() for req in recent_requests]
+        })
+    else:
+        return render_template('admin/dashboard.html',
+                              stats={
+                                  'total_users': total_users,
+                                  'total_artisans': total_artisans,
+                                  'total_requests': total_requests,
+                                  'pending_requests': pending_requests,
+                                  'active_requests': active_requests,
+                                  'completed_requests': completed_requests,
+                                  'pending_verifications': pending_verifications
+                              },
+                              recent_requests=recent_requests,
+                              pending_verifications=pending_artisans)
 
 # User Management
 @admin_bp.route('/users', methods=['GET'])
 @admin_required
-def get_users():
+def manage_users():
     users = User.query.all()
-    return jsonify({'users': [user.to_dict() for user in users]})
+    
+    if request.is_json:
+        return jsonify({'users': [user.to_dict() for user in users]})
+    else:
+        return render_template('admin/manage_users.html', users=users)
 
 @admin_bp.route('/users/<user_id>', methods=['GET', 'PUT', 'DELETE'])
 @admin_required
@@ -57,7 +89,10 @@ def manage_user(user_id):
     user = User.query.get_or_404(user_id)
     
     if request.method == 'GET':
-        return jsonify(user.to_dict())
+        if request.is_json:
+            return jsonify(user.to_dict())
+        else:
+            return render_template('admin/view_user.html', user=user)
     
     elif request.method == 'PUT':
         data = request.get_json()
@@ -79,15 +114,23 @@ def manage_user(user_id):
 # Artisan Management
 @admin_bp.route('/artisans', methods=['GET'])
 @admin_required
-def get_artisans():
+def manage_artisans():
     artisans = Artisan.query.all()
-    return jsonify({'artisans': [artisan.to_dict() for artisan in artisans]})
+    
+    if request.is_json:
+        return jsonify({'artisans': [artisan.to_dict() for artisan in artisans]})
+    else:
+        return render_template('admin/manage_artisans.html', artisans=artisans)
 
 @admin_bp.route('/artisans/pending-verification', methods=['GET'])
 @admin_required
 def get_pending_verification():
     artisans = Artisan.query.filter_by(is_verified=False).all()
-    return jsonify({'artisans': [artisan.to_dict() for artisan in artisans]})
+    
+    if request.is_json:
+        return jsonify({'artisans': [artisan.to_dict() for artisan in artisans]})
+    else:
+        return render_template('admin/verify_artisans.html', artisans=artisans)
 
 @admin_bp.route('/artisans/<artisan_id>/verify', methods=['PUT'])
 @admin_required
@@ -116,7 +159,10 @@ def manage_artisan(artisan_id):
     artisan = Artisan.query.get_or_404(artisan_id)
     
     if request.method == 'GET':
-        return jsonify(artisan.to_dict())
+        if request.is_json:
+            return jsonify(artisan.to_dict())
+        else:
+            return render_template('admin/view_artisan.html', artisan=artisan)
     
     elif request.method == 'PUT':
         data = request.get_json()
@@ -140,7 +186,7 @@ def manage_artisan(artisan_id):
 # Service Request Management
 @admin_bp.route('/service-requests', methods=['GET'])
 @admin_required
-def get_all_service_requests():
+def manage_requests():
     status = request.args.get('status')
     
     query = ServiceRequest.query
@@ -149,13 +195,35 @@ def get_all_service_requests():
         query = query.filter_by(status=status)
     
     service_requests = query.order_by(ServiceRequest.created_at.desc()).all()
-    return jsonify({'service_requests': [req.to_dict() for req in service_requests]})
+    
+    if request.is_json:
+        return jsonify({'service_requests': [req.to_dict() for req in service_requests]})
+    else:
+        return render_template('admin/manage_requests.html', 
+                              requests=service_requests,
+                              status_filter=status)
 
 @admin_bp.route('/service-requests/<request_id>', methods=['GET'])
 @admin_required
-def get_service_request_details(request_id):
+def view_request_admin(request_id):
     service_request = ServiceRequest.query.get_or_404(request_id)
-    return jsonify(service_request.to_dict())
+    
+    # Get available artisans for this category
+    available_artisans = Artisan.query.filter_by(
+        category=service_request.category.name,
+        is_verified=True,
+        is_active=True
+    ).all()
+    
+    if request.is_json:
+        return jsonify({
+            'request': service_request.to_dict(),
+            'available_artisans': [artisan.to_dict() for artisan in available_artisans]
+        })
+    else:
+        return render_template('admin/view_request.html', 
+                              request=service_request,
+                              available_artisans=available_artisans)
 
 @admin_bp.route('/service-requests/<request_id>/assign', methods=['POST'])
 @admin_required
@@ -273,7 +341,11 @@ def update_request_price(request_id):
 def manage_categories():
     if request.method == 'GET':
         categories = ServiceCategory.query.all()
-        return jsonify({'categories': [cat.to_dict() for cat in categories]})
+        
+        if request.is_json:
+            return jsonify({'categories': [cat.to_dict() for cat in categories]})
+        else:
+            return render_template('admin/manage_categories.html', categories=categories)
     
     elif request.method == 'POST':
         data = request.get_json()
@@ -328,7 +400,10 @@ def get_admin_notifications():
         user_type='admin'
     ).order_by(Notification.created_at.desc()).limit(50).all()
     
-    return jsonify({'notifications': [n.to_dict() for n in notifications]})
+    if request.is_json:
+        return jsonify({'notifications': [n.to_dict() for n in notifications]})
+    else:
+        return render_template('admin/notifications.html', notifications=notifications)
 
 # Report Generation
 @admin_bp.route('/reports/service-requests', methods=['GET'])
@@ -368,4 +443,7 @@ def generate_service_report():
         category_name = req.category.name if req.category else 'Unknown'
         report_data['by_category'][category_name] = report_data['by_category'].get(category_name, 0) + 1
     
-    return jsonify(report_data)
+    if request.is_json:
+        return jsonify(report_data)
+    else:
+        return render_template('admin/reports.html', report_data=report_data)

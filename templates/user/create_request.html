@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Request Service - Uwaila Global{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 py-3">
+                <h3 class="card-title mb-0"><i class="fas fa-plus-circle me-2 text-primary"></i>Request Service</h3>
+                <p class="text-muted mb-0">Fill out the form below to request a service from our verified artisans</p>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST" action="{{ url_for('create_service_request') }}">
+                    {{ form.hidden_tag() if form }}
+                    
+                    <!-- Service Details -->
+                    <div class="mb-4">
+                        <h5 class="mb-3"><i class="fas fa-info-circle me-2"></i>Service Details</h5>
+                        
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Service Title *</label>
+                            <input type="text" class="form-control" id="title" name="title" 
+                                   placeholder="e.g., Fix leaking kitchen tap" required>
+                            <div class="form-text">Briefly describe what service you need</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="category_id" class="form-label">Service Category *</label>
+                            <select class="form-select" id="category_id" name="category_id" required>
+                                <option value="">Select category</option>
+                                {% for category in categories %}
+                                <option value="{{ category.id }}">{{ category.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Detailed Description *</label>
+                            <textarea class="form-control" id="description" name="description" 
+                                      rows="4" placeholder="Provide detailed information about the service required..." required></textarea>
+                            <div class="form-text">Include as many details as possible for better matching</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Location & Timing -->
+                    <div class="mb-4">
+                        <h5 class="mb-3"><i class="fas fa-map-marker-alt me-2"></i>Location & Timing</h5>
+                        
+                        <div class="mb-3">
+                            <label for="location" class="form-label">Service Location *</label>
+                            <input type="text" class="form-control" id="location" name="location" 
+                                   placeholder="Full address or area" required>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="preferred_date" class="form-label">Preferred Date</label>
+                                <input type="date" class="form-control" id="preferred_date" name="preferred_date" 
+                                       min="{{ today }}">
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="preferred_time" class="form-label">Preferred Time</label>
+                                <select class="form-select" id="preferred_time" name="preferred_time">
+                                    <option value="">Any time</option>
+                                    <option value="Morning (8am-12pm)">Morning (8am-12pm)</option>
+                                    <option value="Afternoon (12pm-4pm)">Afternoon (12pm-4pm)</option>
+                                    <option value="Evening (4pm-8pm)">Evening (4pm-8pm)</option>
+                                    <option value="Flexible">Flexible</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Contact Information -->
+                    <div class="mb-4">
+                        <h5 class="mb-3"><i class="fas fa-phone-alt me-2"></i>Contact Information</h5>
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Your contact information will be shared with the assigned artisan only after admin approval. 
+                            All communication is managed through our secure platform.
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Your Name</label>
+                                <input type="text" class="form-control" value="{{ current_user.full_name }}" disabled>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Your Phone</label>
+                                <input type="text" class="form-control" value="{{ current_user.phone }}" disabled>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Your Email</label>
+                            <input type="email" class="form-control" value="{{ current_user.email }}" disabled>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="additional_notes" class="form-label">Additional Notes (Optional)</label>
+                            <textarea class="form-control" id="additional_notes" name="additional_notes" 
+                                      rows="3" placeholder="Any special instructions or requirements..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Important Notice -->
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-exclamation-triangle me-2"></i>Important Notice</h6>
+                        <ul class="mb-0">
+                            <li>Your request will be reviewed by our admin team</li>
+                            <li>You will be matched with the most suitable verified artisan</li>
+                            <li>No direct contact until artisan is officially assigned</li>
+                            <li>You will receive notifications about your request status</li>
+                            <li>All payments are processed through the platform</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Submit Button -->
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                        <a href="{{ url_for('user_dashboard') }}" class="btn btn-outline-secondary me-2">
+                            <i class="fas fa-times me-1"></i>Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane me-1"></i>Submit Request
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Process Information -->
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="fas fa-sync-alt me-2"></i>What Happens Next?</h5>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <div class="text-center p-3">
+                            <div class="step-number bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
+                                 style="width: 50px; height: 50px;">
+                                1
+                            </div>
+                            <h6>Request Submitted</h6>
+                            <p class="small text-muted mb-0">Our admin reviews your request details</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="text-center p-3">
+                            <div class="step-number bg-info text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
+                                 style="width: 50px; height: 50px;">
+                                2
+                            </div>
+                            <h6>Artisan Matching</h6>
+                            <p class="small text-muted mb-0">Admin selects the best artisan for your job</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="text-center p-3">
+                            <div class="step-number bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
+                                 style="width: 50px; height: 50px;">
+                                3
+                            </div>
+                            <h6>Service Delivery</h6>
+                            <p class="small text-muted mb-0">Assigned artisan contacts you to schedule service</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('preferred_date').min = today;
+    
+    // Character counter for description
+    const description = document.getElementById('description');
+    const charCount = document.createElement('div');
+    charCount.className = 'form-text text-end';
+    charCount.innerHTML = '<span id="charCount">0</span>/500 characters';
+    description.parentNode.appendChild(charCount);
+    
+    description.addEventListener('input', function() {
+        document.getElementById('charCount').textContent = this.value.length;
+    });
+</script>
+{% endblock %}
+{% endblock %}

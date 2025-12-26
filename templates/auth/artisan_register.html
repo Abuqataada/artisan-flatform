@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+
+{% block title %}Register as Artisan - Uwaila Global{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-5">
+                <div class="text-center mb-4">
+                    <i class="fas fa-tools fa-3x text-success mb-3"></i>
+                    <h2 class="card-title">Become an Artisan</h2>
+                    <p class="text-muted">Join our network of skilled professionals and get verified jobs</p>
+                </div>
+                
+                <form method="POST" action="{{ url_for('artisan_bp.register') }}" enctype="multipart/form-data">
+                    {{ form.hidden_tag() if form }}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="full_name" class="form-label">Full Name *</label>
+                            <input type="text" class="form-control" id="full_name" name="full_name" required>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="phone" class="form-label">Phone Number *</label>
+                            <input type="tel" class="form-control" id="phone" name="phone" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email Address *</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="category" class="form-label">Service Category *</label>
+                            <select class="form-select" id="category" name="category" required>
+                                <option value="">Select category</option>
+                                
+                                <!-- Construction & Building -->
+                                <optgroup label="🏗️ Construction & Building">
+                                    <option value="Masonry">Masonry (Bricklaying, Concrete Work)</option>
+                                    <option value="Carpentry">Carpentry & Woodwork</option>
+                                    <option value="Roofing">Roofing & Waterproofing</option>
+                                    <option value="Tiling">Tiling & Flooring</option>
+                                    <option value="Painting">Painting & Decoration</option>
+                                    <option value="Drywall">Drywall Installation</option>
+                                    <option value="Steel Fabrication">Steel Fabrication</option>
+                                    <option value="Glass Work">Glass & Aluminum Work</option>
+                                </optgroup>
+                                
+                                <!-- Electrical Services -->
+                                <optgroup label="⚡ Electrical Services">
+                                    <option value="Electrical Wiring">Electrical Wiring & Installation</option>
+                                    <option value="Lighting">Lighting Installation</option>
+                                    <option value="Generator Repair">Generator Installation & Repair</option>
+                                    <option value="Solar Installation">Solar System Installation</option>
+                                    <option value="Inverter Systems">Inverter & UPS Systems</option>
+                                    <option value="Security Systems">Security & CCTV Installation</option>
+                                    <option value="Home Automation">Home Automation & Smart Systems</option>
+                                </optgroup>
+                                
+                                <!-- Plumbing Services -->
+                                <optgroup label="🚰 Plumbing Services">
+                                    <option value="Plumbing">General Plumbing</option>
+                                    <option value="Pipe Fitting">Pipe Fitting & Installation</option>
+                                    <option value="Water Heater">Water Heater Installation</option>
+                                    <option value="Borehole">Borehole Drilling & Maintenance</option>
+                                    <option value="Water Treatment">Water Treatment Systems</option>
+                                    <option value="Septic Tank">Septic Tank Installation</option>
+                                    <option value="Drainage">Drainage & Sewer Systems</option>
+                                </optgroup>
+                                
+                                <!-- HVAC & Cooling -->
+                                <optgroup label="❄️ HVAC & Cooling">
+                                    <option value="AC Installation">Air Conditioner Installation</option>
+                                    <option value="AC Repair">Air Conditioner Repair</option>
+                                    <option value="AC Maintenance">AC Maintenance & Servicing</option>
+                                    <option value="Refrigeration">Refrigeration Systems</option>
+                                    <option value="Ventilation">Ventilation Systems</option>
+                                    <option value="Cold Room">Cold Room Installation</option>
+                                </optgroup>
+                                
+                                <!-- Home Services -->
+                                <optgroup label="🏠 Home Services">
+                                    <option value="Cleaning">Cleaning & Janitorial</option>
+                                    <option value="Pest Control">Pest Control & Fumigation</option>
+                                    <option value="Laundry">Laundry & Dry Cleaning</option>
+                                    <option value="Gardening">Gardening & Landscaping</option>
+                                    <option value="Home Organizing">Home Organizing</option>
+                                    <option value="Moving">Moving & Relocation</option>
+                                </optgroup>
+                                
+                                <!-- Mechanical & Automotive -->
+                                <optgroup label="🔧 Mechanical & Automotive">
+                                    <option value="Auto Repair">Automobile Repair</option>
+                                    <option value="Auto Electrician">Auto Electrician</option>
+                                    <option value="Panel Beating">Panel Beating & Spraying</option>
+                                    <option value="Generator Maintenance">Generator Maintenance</option>
+                                    <option value="Elevator Repair">Elevator & Escalator Repair</option>
+                                    <option value="Industrial Machines">Industrial Machine Repair</option>
+                                </optgroup>
+                                
+                                <!-- Technology & IT -->
+                                <optgroup label="💻 Technology & IT">
+                                    <option value="Computer Repair">Computer & Laptop Repair</option>
+                                    <option value="Phone Repair">Phone & Tablet Repair</option>
+                                    <option value="Network Setup">Network & WiFi Setup</option>
+                                    <option value="Smartphone Repair">Smartphone Repair</option>
+                                    <option value="TV Repair">TV & Electronics Repair</option>
+                                    <option value="Sound Systems">Sound System Installation</option>
+                                </optgroup>
+                                
+                                <!-- Furniture & Interior -->
+                                <optgroup label="🛋️ Furniture & Interior">
+                                    <option value="Furniture Making">Furniture Making</option>
+                                    <option value="Upholstery">Upholstery & Repair</option>
+                                    <option value="Curtains">Curtains & Blinds Installation</option>
+                                    <option value="Interior Design">Interior Design</option>
+                                    <option value="Cabinet Making">Cabinet Making</option>
+                                </optgroup>
+                                
+                                <!-- Metal Work -->
+                                <optgroup label="🔩 Metal Work">
+                                    <option value="Welding">Welding & Fabrication</option>
+                                    <option value="Blacksmith">Blacksmithing</option>
+                                    <option value="Gate Making">Gate & Fence Making</option>
+                                    <option value="Metal Doors">Metal Doors & Windows</option>
+                                    <option value="Iron Bending">Iron Bending</option>
+                                </optgroup>
+                                
+                                <!-- Beauty & Personal Care -->
+                                <optgroup label="💅 Beauty & Personal Care">
+                                    <option value="Hair Styling">Hair Styling & Barbering</option>
+                                    <option value="Makeup Artist">Makeup Artist</option>
+                                    <option value="Nail Technician">Nail Technician</option>
+                                    <option value="Spa Services">Spa & Massage Therapy</option>
+                                    <option value="Tailoring">Tailoring & Fashion Design</option>
+                                </optgroup>
+                                
+                                <!-- Event Services -->
+                                <optgroup label="🎉 Event Services">
+                                    <option value="Catering">Catering & Cooking</option>
+                                    <option value="Photography">Photography & Videography</option>
+                                    <option value="Event Decoration">Event Decoration</option>
+                                    <option value="DJ Services">DJ & Sound Services</option>
+                                    <option value="MC Services">MC & Event Hosting</option>
+                                </optgroup>
+                                
+                                <!-- Professional Services -->
+                                <optgroup label="👔 Professional Services">
+                                    <option value="Tutoring">Tutoring & Teaching</option>
+                                    <option value="Graphic Design">Graphic Design</option>
+                                    <option value="Writing">Writing & Editing</option>
+                                    <option value="Web Development">Web Development</option>
+                                    <option value="Legal Services">Legal Services</option>
+                                    <option value="Accounting">Accounting & Bookkeeping</option>
+                                </optgroup>
+                                
+                                <!-- Health & Wellness -->
+                                <optgroup label="🏥 Health & Wellness">
+                                    <option value="Fitness Training">Fitness Training</option>
+                                    <option value="Yoga Instruction">Yoga Instruction</option>
+                                    <option value="Nutritionist">Nutritionist</option>
+                                    <option value="Home Nursing">Home Nursing Care</option>
+                                    <option value="Therapy">Physical Therapy</option>
+                                </optgroup>
+                                
+                                <!-- Logistics & Delivery -->
+                                <optgroup label="🚚 Logistics & Delivery">
+                                    <option value="Delivery Services">Delivery Services</option>
+                                    <option value="Transportation">Transportation Services</option>
+                                    <option value="Errand Running">Errand Running</option>
+                                    <option value="Courier Services">Courier Services</option>
+                                </optgroup>
+                                
+                                <!-- Other Services -->
+                                <optgroup label="📋 Other Services">
+                                    <option value="Laundry">Laundry & Ironing</option>
+                                    <option value="Child Care">Child Care Services</option>
+                                    <option value="Elderly Care">Elderly Care Services</option>
+                                    <option value="Pet Care">Pet Care & Grooming</option>
+                                    <option value="Other">Other (Specify in Skills)</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="experience_years" class="form-label">Years of Experience *</label>
+                            <input type="number" class="form-control" id="experience_years" name="experience_years" min="0" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="skills" class="form-label">Skills & Specializations *</label>
+                        <textarea class="form-control" id="skills" name="skills" rows="3" 
+                                  placeholder="List your skills, e.g., Pipe fitting, Electrical wiring, etc." required></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="credentials" class="form-label">Certifications & Credentials</label>
+                        <textarea class="form-control" id="credentials" name="credentials" rows="2" 
+                                  placeholder="List your certifications, training, etc."></textarea>
+                        <div class="form-text">Separate credentials with commas</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="portfolio_images" class="form-label">Portfolio Images</label>
+                        <input type="file" class="form-control" id="portfolio_images" name="portfolio_images" 
+                               accept="image/*" multiple>
+                        <div class="form-text">Upload images of your previous work (optional)</div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="password" class="form-label">Password *</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="confirm_password" class="form-label">Confirm Password *</label>
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="availability" name="availability" checked>
+                            <label class="form-check-label" for="availability">
+                                I am available for jobs immediately
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="terms" name="terms" required>
+                            <label class="form-check-label" for="terms">
+                                I agree to the <a href="#" class="text-decoration-none">Artisan Agreement</a>, 
+                                <a href="#" class="text-decoration-none">Terms of Service</a>, and 
+                                <a href="#" class="text-decoration-none">Privacy Policy</a>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Note:</strong> Your account will be reviewed and verified by our admin team 
+                        before you can start receiving job assignments. This process typically takes 24-48 hours.
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="fas fa-check-circle me-2"></i>Submit for Verification
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
