@@ -218,58 +218,105 @@
             </div>
             <div class="card-body portfolio-container">
                 {% if portfolio_images %}
-                <div class="row" id="portfolioGrid">
-                    {% for image in portfolio_images %}
-                    <div class="col-md-4 col-sm-6 mb-4" data-image-path="{{ image }}">
-                        <div class="image-card">
-                            {% if loop.first %}
-                            <div class="featured-badge">
-                                <i class="fas fa-star me-1"></i>Featured
+                    <div class="row" id="portfolioGrid">
+                        {% for image in portfolio_images %}
+                        <div class="col-md-4 col-sm-6 mb-4" 
+                            data-image-url="{{ image.url if image.url is string else image }}" 
+                            data-public-id="{{ image.public_id if image.public_id else '' }}">
+                            <div class="image-card">
+                                {% if loop.first %}
+                                <div class="featured-badge">
+                                    <i class="fas fa-star me-1"></i>Featured
+                                </div>
+                                {% endif %}
+                                <div class="image-counter">
+                                    {{ loop.index }}
+                                </div>
+                                
+                                {# Handle both old format (string URLs) and new format (dictionaries) #}
+                                {% if image is string %}
+                                    {# Old format - direct URL string #}
+                                    <img src="{{ image }}" 
+                                        alt="Portfolio image {{ loop.index }}" 
+                                        class="portfolio-image" 
+                                        onerror="this.src='{{ url_for('static', filename='images/default-portfolio.jpg') }}'">
+                                {% else %}
+                                    {# New format - dictionary with url and public_id #}
+                                    <img src="{{ image.url }}" 
+                                        alt="Portfolio image {{ loop.index }}" 
+                                        class="portfolio-image" 
+                                        onerror="this.src='{{ url_for('static', filename='images/default-portfolio.jpg') }}'">
+                                {% endif %}
+                                
+                                <div class="image-overlay">
+                                    <div class="image-actions">
+                                        {% if image is string %}
+                                            {# Old format #}
+                                            <button class="btn btn-sm btn-outline-light view-image" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#imageModal"
+                                                    data-image="{{ image }}">
+                                                <i class="fas fa-expand"></i>
+                                            </button>
+                                        {% else %}
+                                            {# New format #}
+                                            <button class="btn btn-sm btn-outline-light view-image" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#imageModal"
+                                                    data-image="{{ image.url }}">
+                                                <i class="fas fa-expand"></i>
+                                            </button>
+                                        {% endif %}
+                                        
+                                        {% if not loop.first %}
+                                        <button class="btn btn-sm btn-warning set-featured" 
+                                                data-public-id="{{ image.public_id if image.public_id else '' }}"
+                                                data-image-url="{{ image.url if image.url is string else image }}">
+                                            <i class="fas fa-star"></i>
+                                        </button>
+                                        {% endif %}
+                                        
+                                        <button class="btn btn-sm btn-danger delete-image" 
+                                                data-public-id="{{ image.public_id if image.public_id else '' }}"
+                                                data-image-url="{{ image.url if image.url is string else image }}">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
-                            {% endif %}
-                            <div class="image-counter">
-                                {{ loop.index }}
-                            </div>
-                            <img src="{{ url_for('static', filename='uploads/' + image) }}" 
-                                 alt="Portfolio image {{ loop.index }}" 
-                                 class="portfolio-image" 
-                                 onerror="this.src='{{ url_for('static', filename='img/default-portfolio.jpg') }}'">
-                            <div class="image-overlay">
-                                <div class="image-actions">
-                                    <button class="btn btn-sm btn-outline-light view-image" 
-                                            data-bs-toggle="modal" 
-                                            data-bs-target="#imageModal"
-                                            data-image="{{ url_for('static', filename='uploads/' + image) }}">
-                                        <i class="fas fa-expand"></i>
-                                    </button>
-                                    {% if not loop.first %}
-                                    <button class="btn btn-sm btn-warning set-featured" 
-                                            data-image-path="{{ image }}">
-                                        <i class="fas fa-star"></i>
-                                    </button>
-                                    {% endif %}
-                                    <button class="btn btn-sm btn-danger delete-image" 
-                                            data-image-path="{{ image }}">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    {# Image Modal #}
+                    <div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-body text-center p-0">
+                                    <img src="" alt="Portfolio image" id="modalImage" class="img-fluid" style="max-height: 80vh;">
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    <a href="#" class="btn btn-primary" id="modalDownloadLink" download>
+                                        <i class="fas fa-download me-1"></i>Download
+                                    </a>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    {% endfor %}
-                </div>
-                
-                <!-- Reorder Instructions -->
-                <div class="alert alert-info mt-3">
-                    <i class="fas fa-info-circle me-2"></i>
-                    <strong>Tip:</strong> Drag and drop images to reorder your portfolio. 
-                    The first image will be shown as your featured work to clients.
-                </div>
+                    
+                    <!-- Reorder Instructions -->
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Tip:</strong> Drag and drop images to reorder your portfolio. 
+                        The first image will be shown as your featured work to clients.
+                    </div>
+                    
                 {% else %}
                 <!-- Empty State -->
-                <div class="empty-state">
-                    <i class="fas fa-images"></i>
-                    <h4>Your portfolio is empty</h4>
+                <div class="text-center py-5">
+                    <i class="fas fa-images fa-4x text-muted mb-3"></i>
+                    <h4 class="mb-2">Your portfolio is empty</h4>
                     <p class="text-muted mb-4">
                         Upload images of your previous work to showcase your skills to potential clients.
                     </p>
@@ -311,6 +358,7 @@
         </div>
     </div>
 </div>
+
 
 <!-- Upload Modal -->
 <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
@@ -771,6 +819,109 @@
             uploadButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading...';
             uploadButton.disabled = true;
         });
+    });
+
+    $(document).ready(function() {
+        // View image in modal
+        $('.view-image').click(function() {
+            const imageUrl = $(this).data('image');
+            $('#modalImage').attr('src', imageUrl);
+            $('#modalDownloadLink').attr('href', imageUrl);
+        });
+        
+        // Delete image
+        $('.delete-image').click(function() {
+            const publicId = $(this).data('public-id');
+            const imageUrl = $(this).data('image-url');
+            
+            if (!publicId) {
+                alert('Cannot delete: Image information missing');
+                return;
+            }
+            
+            if (confirm('Are you sure you want to delete this image? This action cannot be undone.')) {
+                // Show loading
+                $(this).html('<i class="fas fa-spinner fa-spin"></i>');
+                
+                $.ajax({
+                    url: '{{ url_for("artisan_bp.delete_portfolio_image") }}',
+                    method: 'POST',
+                    data: {
+                        public_id: publicId
+                    },
+                    success: function(response) {
+                        location.reload();
+                    },
+                    error: function(xhr, status, error) {
+                        alert('Error deleting image: ' + error);
+                        location.reload();
+                    }
+                });
+            }
+        });
+        
+        // Set featured image
+        $('.set-featured').click(function() {
+            const publicId = $(this).data('public-id');
+            const imageUrl = $(this).data('image-url');
+            
+            if (!publicId) {
+                alert('Cannot set as featured: Image information missing');
+                return;
+            }
+            
+            if (confirm('Set this image as your featured portfolio image?')) {
+                // Show loading
+                $(this).html('<i class="fas fa-spinner fa-spin"></i>');
+                
+                $.ajax({
+                    url: '{{ url_for("artisan_bp.set_featured_image") }}', // You'll need to create this route
+                    method: 'POST',
+                    data: {
+                        public_id: publicId
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            location.reload();
+                        } else {
+                            alert('Error: ' + response.error);
+                            location.reload();
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        alert('Error setting featured image: ' + error);
+                        location.reload();
+                    }
+                });
+            }
+        });
+        
+        // Drag and drop reordering (optional)
+        if ($('#portfolioGrid').length > 0) {
+            new Sortable(document.getElementById('portfolioGrid'), {
+                animation: 150,
+                onEnd: function(evt) {
+                    const order = Array.from(evt.from.children).map(function(child) {
+                        return $(child).data('public-id') || $(child).data('image-url');
+                    }).filter(id => id);
+                    
+                    $.ajax({
+                        url: '{{ url_for("artisan_bp.reorder_portfolio_images") }}',
+                        method: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({ order: order }),
+                        success: function(response) {
+                            if (!response.success) {
+                                console.error('Reordering failed:', response.error);
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('Reordering error:', error);
+                        }
+                    });
+                }
+            });
+        }
     });
 </script>
 {% endblock %}

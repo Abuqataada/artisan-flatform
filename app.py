@@ -10,6 +10,10 @@ from dateutil import tz
 from dotenv import load_dotenv
 from extension import app
 
+import cloudinary
+import cloudinary.uploader
+
+
 login_manager = LoginManager()
 migrate = Migrate()
 
@@ -17,9 +21,31 @@ def create_app(config_class=Config):
     app.config['UPLOAD_FOLDER'] = 'static/uploads'
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
-    # Create upload directories if they don't exist
-    os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'portfolio'), exist_ok=True)
     app.config.from_object(config_class)
+    
+    # Initialize Cloudinary if credentials exist
+    if (app.config.get('CLOUDINARY_CLOUD_NAME') and 
+        app.config.get('CLOUDINARY_API_KEY') and 
+        app.config.get('CLOUDINARY_API_SECRET')):
+        
+        cloudinary.config(
+            cloud_name=app.config['CLOUDINARY_CLOUD_NAME'],
+            api_key=app.config['CLOUDINARY_API_KEY'],
+            api_secret=app.config['CLOUDINARY_API_SECRET'],
+            secure=True
+        )
+        app.config['USE_CLOUD_STORAGE'] = True
+    else:
+        app.config['USE_CLOUD_STORAGE'] = False
+        
+        # Create local directories only in development
+        if app.config.get('FLASK_ENV') == 'development':
+            try:
+                upload_path = app.config['UPLOAD_FOLDER']
+                os.makedirs(os.path.join(upload_path, 'portfolio'), exist_ok=True)
+                os.makedirs(os.path.join(upload_path, 'temp'), exist_ok=True)
+            except OSError:
+                print("Warning: Could not create upload directories")
     
     # Initialize extensions
     db.init_app(app)

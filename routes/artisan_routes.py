@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash
+from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from functools import wraps
 from models import db, Artisan, ServiceRequest, ServiceCategory, Notification
@@ -11,59 +11,113 @@ import io
 import re
 from extension import app
 
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+
+
 artisan_bp = Blueprint('artisan_bp', __name__)
 
-# Add these configuration variables at the top of the file or in your config
+# Configuration
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB
+MAX_PORTFOLIO_IMAGES = 20
 
 def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    """Check if the file extension is allowed"""
+    if not filename or '.' not in filename:
+        return False
+    ext = filename.rsplit('.', 1)[1].lower()
+    return ext in ALLOWED_EXTENSIONS
 
-def save_portfolio_image(file, artisan_id):
-    """Save uploaded image and return the filename"""
-    if file and allowed_file(file.filename):
-        # Generate unique filename
-        filename = secure_filename(file.filename)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        unique_filename = f"{artisan_id}_{timestamp}_{filename}"
-        
-        # Create upload directory if it doesn't exist
-        upload_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'portfolio', artisan_id)
-        os.makedirs(upload_dir, exist_ok=True)
-        
-        # Save the file
-        filepath = os.path.join(upload_dir, unique_filename)
-        
-        # Optimize and resize image
-        try:
-            img = Image.open(file)
-            
-            # Convert to RGB if necessary
-            if img.mode in ('RGBA', 'P'):
-                img = img.convert('RGB')
-            
-            # Resize if too large (max 1200px width)
-            max_width = 1200
-            if img.width > max_width:
-                ratio = max_width / img.width
-                new_height = int(img.height * ratio)
-                img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
-            
-            # Save optimized image
-            img.save(filepath, 'JPEG', quality=85, optimize=True)
-            
-            # Return relative path for database storage
-            return os.path.join('portfolio', artisan_id, unique_filename)
-            
-        except Exception as e:
-            print(f"Error processing image: {e}")
-            return None
+def validate_image_file(file):
+    """Comprehensive validation for image files"""
+    if not file or file.filename == '':
+        return False, "No file selected"
     
-    return None
+    if not allowed_file(file.filename):
+        return False, f"File type not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+    
+    # Check file size
+    file.seek(0, os.SEEK_END)
+    file_length = file.tell()
+    file.seek(0)
+    
+    if file_length == 0:
+        return False, "File is empty"
+    
+    if file_length > MAX_FILE_SIZE:
+        size_mb = file_length / (1024 * 1024)
+        return False, f"File too large ({size_mb:.1f}MB). Max: {MAX_FILE_SIZE/(1024*1024)}MB"
+    
+    return True, "Valid"
+
+def upload_to_cloudinary(file, artisan_id):
+    """Upload file to Cloudinary with optimized settings"""
+    try:
+        # Generate unique filename with timestamp
+        timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S%f')[:-3]
+        original_name = secure_filename(file.filename)
+        name_without_ext = os.path.splitext(original_name)[0]
+        
+        # Create unique public ID
+        public_id = f"{artisan_id}_{timestamp}_{name_without_ext}"
+        
+        # Upload to Cloudinary with optimization
+        result = cloudinary.uploader.upload(
+            file,
+            public_id=public_id,
+            folder=f"artisans/{artisan_id}/portfolio",
+            use_filename=False,  # Use our generated public_id
+            unique_filename=True,
+            overwrite=False,
+            resource_type="auto",
+            transformation=[
+                {'width': 1200, 'crop': 'limit'},  # Responsive sizing
+                {'quality': 'auto:good'},          # Auto quality
+                {'fetch_format': 'auto'}           # Auto format
+            ],
+            tags=[f"artisan_{artisan_id}", "portfolio"]
+        )
+        
+        # Return secure URL
+        return {
+            'url': result.get('secure_url'),
+            'public_id': result.get('public_id'),
+            'format': result.get('format'),
+            'bytes': result.get('bytes'),
+            'created_at': result.get('created_at')
+        }
+        
+    except cloudinary.exceptions.Error as e:
+        current_app.logger.error(f"Cloudinary upload error: {str(e)}")
+        return None
+    except Exception as e:
+        current_app.logger.error(f"Unexpected upload error: {str(e)}")
+        return None
+
+def get_portfolio_images(user):
+    """Safely retrieve portfolio images from user"""
+    try:
+        if user.portfolio_images:
+            return json.loads(user.portfolio_images)
+    except (json.JSONDecodeError, TypeError, AttributeError) as e:
+        current_app.logger.warning(f"Error parsing portfolio images: {str(e)}")
+    return []
+
+def save_portfolio_images(user, images):
+    """Save portfolio images to user with proper error handling"""
+    try:
+        user.portfolio_images = json.dumps(images)
+        db.session.commit()
+        return True
+    except Exception as e:
+        current_app.logger.error(f"Database error saving portfolio: {str(e)}")
+        db.session.rollback()
+        return False
 
 
+        
 # Artisan Authentication Middleware
 def artisan_required(f):
     @wraps(f)
@@ -483,165 +537,230 @@ def calculate_completion_rate(artisan_id):
 @artisan_bp.route('/portfolio', methods=['GET', 'POST'])
 @artisan_required
 def artisan_portfolio():
-    if request.method == 'GET':
-        # Get portfolio images from database
-        portfolio_images = []
-        if current_user.portfolio_images:
-            try:
-                portfolio_images = json.loads(current_user.portfolio_images)
-            except:
-                portfolio_images = []
-        
-        return render_template('artisan/portfolio.html', 
-                              portfolio_images=portfolio_images)
+    """Handle portfolio management - view and upload images"""
     
-    elif request.method == 'POST':
-        # Handle portfolio image upload
-        if 'portfolio_images' not in request.files:
-            flash('No files selected', 'danger')
-            return redirect(url_for('artisan_bp.artisan_portfolio'))
-        
-        files = request.files.getlist('portfolio_images')
-        uploaded_files = []
-        
-        for file in files:
-            if file and file.filename != '':
-                # Check file size
-                file.seek(0, os.SEEK_END)
-                file_length = file.tell()
-                file.seek(0)
+    if request.method == 'GET':
+        try:
+            portfolio_images = get_portfolio_images(current_user)
+            return render_template('artisan/portfolio.html',
+                                 portfolio_images=portfolio_images,
+                                 max_images=MAX_PORTFOLIO_IMAGES)
+        except Exception as e:
+            current_app.logger.error(f"Error loading portfolio: {str(e)}")
+            flash('Error loading portfolio', 'danger')
+            return render_template('artisan/portfolio.html', portfolio_images=[])
+    
+    # POST - Handle file uploads
+    if 'portfolio_images' not in request.files:
+        flash('No files selected', 'danger')
+        return redirect(url_for('artisan_bp.artisan_portfolio'))
+    
+    files = request.files.getlist('portfolio_images')
+    if not files or len(files) == 0:
+        flash('No files selected', 'danger')
+        return redirect(url_for('artisan_bp.artisan_portfolio'))
+    
+    uploaded_images = []
+    errors = []
+    successful_uploads = 0
+    
+    # Check total files being uploaded
+    existing_count = len(get_portfolio_images(current_user))
+    if existing_count + len(files) > MAX_PORTFOLIO_IMAGES:
+        flash(f'You can only have {MAX_PORTFOLIO_IMAGES} images total. '
+              f'You have {existing_count} images currently.', 'warning')
+        # Allow upload but will trim later
+    
+    for index, file in enumerate(files):
+        if file and file.filename != '':
+            # Validate file
+            is_valid, error_msg = validate_image_file(file)
+            if not is_valid:
+                errors.append(f"{file.filename}: {error_msg}")
+                continue
+            
+            try:
+                # Upload to Cloudinary
+                upload_result = upload_to_cloudinary(file, current_user.id)
                 
-                if file_length > MAX_FILE_SIZE:
-                    flash(f'File {file.filename} is too large (max 16MB)', 'warning')
-                    continue
-                
-                # Save the image
-                saved_path = save_portfolio_image(file, current_user.id)
-                if saved_path:
-                    uploaded_files.append(saved_path)
-        
-        if uploaded_files:
+                if upload_result and upload_result.get('url'):
+                    uploaded_images.append({
+                        'url': upload_result['url'],
+                        'public_id': upload_result.get('public_id'),
+                        'uploaded_at': datetime.utcnow().isoformat()
+                    })
+                    successful_uploads += 1
+                else:
+                    errors.append(f"{file.filename}: Upload failed")
+                    
+            except Exception as e:
+                current_app.logger.error(f"Upload error for {file.filename}: {str(e)}")
+                errors.append(f"{file.filename}: Upload error")
+    
+    # Process successful uploads
+    if successful_uploads > 0:
+        try:
             # Get existing images
-            existing_images = []
-            if current_user.portfolio_images:
-                try:
-                    existing_images = json.loads(current_user.portfolio_images)
-                except:
-                    existing_images = []
+            existing_images = get_portfolio_images(current_user)
             
-            # Add new images
-            existing_images.extend(uploaded_files)
+            # Add new images at the beginning (newest first)
+            new_portfolio = uploaded_images + existing_images
             
-            # Limit to 20 images maximum
-            if len(existing_images) > 20:
-                existing_images = existing_images[-20:]
-                flash('Portfolio limited to 20 images. Oldest images removed.', 'info')
+            # Limit total images
+            if len(new_portfolio) > MAX_PORTFOLIO_IMAGES:
+                removed_count = len(new_portfolio) - MAX_PORTFOLIO_IMAGES
+                new_portfolio = new_portfolio[:MAX_PORTFOLIO_IMAGES]
+                flash(f'Portfolio limited to {MAX_PORTFOLIO_IMAGES} images. '
+                      f'{removed_count} oldest image(s) removed.', 'info')
             
             # Save to database
-            current_user.portfolio_images = json.dumps(existing_images)
-            db.session.commit()
-            
-            flash(f'Successfully uploaded {len(uploaded_files)} image(s)', 'success')
+            if save_portfolio_images(current_user, new_portfolio):
+                flash(f'Successfully uploaded {successful_uploads} image(s)', 'success')
+            else:
+                flash('Error saving portfolio to database', 'danger')
+                # Note: Images are already uploaded to Cloudinary but not linked
+                
+        except Exception as e:
+            current_app.logger.error(f"Error updating portfolio: {str(e)}")
+            flash('Error updating portfolio', 'danger')
+    
+    # Display errors
+    if errors:
+        error_count = len(errors)
+        if error_count <= 3:
+            for error in errors:
+                flash(error, 'warning')
         else:
-            flash('No valid images uploaded', 'warning')
-        
-        return redirect(url_for('artisan_bp.artisan_portfolio'))
+            flash(f'{error_count} files had errors. First few: {", ".join(errors[:3])}', 'warning')
+    
+    elif successful_uploads == 0:
+        flash('No images were uploaded successfully', 'warning')
+    
+    return redirect(url_for('artisan_bp.artisan_portfolio'))
+
 
 @artisan_bp.route('/portfolio/delete', methods=['POST'])
 @artisan_required
 def delete_portfolio_image():
-    data = request.get_json()
-    image_path = data.get('image_path')
-    
-    if not image_path:
-        return jsonify({'error': 'No image path provided'}), 400
-    
-    # Get current portfolio images
-    portfolio_images = []
-    if current_user.portfolio_images:
-        try:
-            portfolio_images = json.loads(current_user.portfolio_images)
-        except:
-            portfolio_images = []
-    
-    # Remove the image from the list
-    if image_path in portfolio_images:
-        portfolio_images.remove(image_path)
+    """Delete a portfolio image from Cloudinary and database"""
+    try:
+        public_id = request.form.get('public_id')
         
-        # Try to delete the physical file
-        try:
-            full_path = os.path.join(app.config['UPLOAD_FOLDER'], image_path)
-            if os.path.exists(full_path):
-                os.remove(full_path)
-        except Exception as e:
-            print(f"Error deleting file: {e}")
+        if not public_id:
+            flash('No image specified', 'danger')
+            return redirect(url_for('artisan_bp.artisan_portfolio'))
         
-        # Update database
-        current_user.portfolio_images = json.dumps(portfolio_images)
-        db.session.commit()
+        # Get current portfolio
+        portfolio_images = get_portfolio_images(current_user)
         
-        return jsonify({'success': True, 'message': 'Image deleted'})
+        # Find and remove the image
+        image_to_remove = None
+        updated_portfolio = []
+        
+        for img in portfolio_images:
+            if img.get('public_id') == public_id:
+                image_to_remove = img
+            else:
+                updated_portfolio.append(img)
+        
+        if image_to_remove:
+            try:
+                # Delete from Cloudinary
+                cloudinary.uploader.destroy(
+                    image_to_remove['public_id'],
+                    resource_type="image"
+                )
+                current_app.logger.info(f"Deleted image from Cloudinary: {public_id}")
+            except Exception as e:
+                current_app.logger.error(f"Cloudinary delete error: {str(e)}")
+                # Continue anyway - we'll remove from our DB
+            
+            # Update database
+            if save_portfolio_images(current_user, updated_portfolio):
+                flash('Image removed from portfolio', 'success')
+            else:
+                flash('Error updating portfolio', 'danger')
+        else:
+            flash('Image not found in portfolio', 'warning')
+            
+    except Exception as e:
+        current_app.logger.error(f"Delete error: {str(e)}")
+        flash('Error removing image', 'danger')
     
-    return jsonify({'error': 'Image not found'}), 404
+    return redirect(url_for('artisan_bp.artisan_portfolio'))
+
 
 @artisan_bp.route('/portfolio/reorder', methods=['POST'])
 @artisan_required
 def reorder_portfolio_images():
-    data = request.get_json()
-    new_order = data.get('order', [])
+    """Reorder portfolio images"""
+    try:
+        order = request.json.get('order', [])
+        if not order:
+            return jsonify({'success': False, 'error': 'No order provided'}), 400
+        
+        # Validate order contains only public_ids from user's portfolio
+        portfolio_images = get_portfolio_images(current_user)
+        portfolio_dict = {img.get('public_id'): img for img in portfolio_images}
+        
+        # Reorder based on provided order
+        reordered_images = []
+        for public_id in order:
+            if public_id in portfolio_dict:
+                reordered_images.append(portfolio_dict[public_id])
+        
+        # Add any missing images (shouldn't happen but safety)
+        for img in portfolio_images:
+            if img.get('public_id') not in order:
+                reordered_images.append(img)
+        
+        # Save reordered portfolio
+        if save_portfolio_images(current_user, reordered_images):
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Database error'}), 500
+            
+    except Exception as e:
+        current_app.logger.error(f"Reorder error: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
     
-    if not new_order:
-        return jsonify({'error': 'No order provided'}), 400
-    
-    # Validate that all images belong to this artisan
-    portfolio_images = []
-    if current_user.portfolio_images:
-        try:
-            portfolio_images = json.loads(current_user.portfolio_images)
-        except:
-            portfolio_images = []
-    
-    # Check if all images in new order exist in current portfolio
-    if not all(img in portfolio_images for img in new_order):
-        return jsonify({'error': 'Invalid image list'}), 400
-    
-    # Update the order
-    current_user.portfolio_images = json.dumps(new_order)
-    db.session.commit()
-    
-    return jsonify({'success': True, 'message': 'Portfolio order updated'})
-
-@artisan_bp.route('/portfolio/set-featured', methods=['POST'])
+@artisan_bp.route('/portfolio/featured', methods=['POST'])
 @artisan_required
 def set_featured_image():
-    data = request.get_json()
-    image_path = data.get('image_path')
-    
-    if not image_path:
-        return jsonify({'error': 'No image path provided'}), 400
-    
-    # Get current portfolio images
-    portfolio_images = []
-    if current_user.portfolio_images:
-        try:
-            portfolio_images = json.loads(current_user.portfolio_images)
-        except:
-            portfolio_images = []
-    
-    # Check if image exists
-    if image_path in portfolio_images:
-        # Move image to first position (featured)
-        portfolio_images.remove(image_path)
-        portfolio_images.insert(0, image_path)
+    """Set an image as featured (move to first position)"""
+    try:
+        public_id = request.form.get('public_id')
         
-        # Update database
-        current_user.portfolio_images = json.dumps(portfolio_images)
-        db.session.commit()
+        if not public_id:
+            return jsonify({'success': False, 'error': 'No image specified'})
         
-        return jsonify({'success': True, 'message': 'Featured image updated'})
+        portfolio_images = get_portfolio_images(current_user)
+        
+        # Find the image
+        image_to_feature = None
+        other_images = []
+        
+        for img in portfolio_images:
+            if img.get('public_id') == public_id:
+                image_to_feature = img
+            else:
+                other_images.append(img)
+        
+        if image_to_feature:
+            # Move to first position
+            new_portfolio = [image_to_feature] + other_images
+            
+            if save_portfolio_images(current_user, new_portfolio):
+                return jsonify({'success': True})
+            else:
+                return jsonify({'success': False, 'error': 'Database error'})
+        else:
+            return jsonify({'success': False, 'error': 'Image not found'})
+            
+    except Exception as e:
+        current_app.logger.error(f"Set featured error: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
     
-    return jsonify({'error': 'Image not found'}), 404
-
 # Add a route to serve portfolio images
 @artisan_bp.route('/portfolio/image/<path:filename>')
 def serve_portfolio_image(filename):
