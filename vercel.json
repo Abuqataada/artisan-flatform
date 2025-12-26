@@ -37,16 +37,5 @@
         "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()"
       }
     }
-  ],
-  "env": {
-    "SECRET_KEY": "@uwaila_secret_key",
-    "DATABASE_URL": "sqlite:///artisan_platform.db",
-    "FLASK_ENV": "production",
-    "MAIL_SERVER": "smtp.gmail.com",
-    "MAIL_PORT": "587",
-    "MAIL_USE_TLS": "true",
-    "MAIL_USERNAME": "@uwaila_email",
-    "MAIL_PASSWORD": "@uwaila_email_password",
-    "JWT_SECRET_KEY": "@uwaila_jwt_secret"
-  }
+  ]
 }
