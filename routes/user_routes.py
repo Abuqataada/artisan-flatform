@@ -418,15 +418,67 @@ def mark_notification_read(notification_id):
 @user_bp.route('/profile', methods=['GET', 'PUT'])
 @login_required
 def profile():
+    """Profile management"""
     if not isinstance(current_user, User):
         flash('User access required', 'danger')
         return redirect(url_for('user_bp.dashboard'))
     
     if request.method == 'GET':
-        if request.is_json:
-            return jsonify(current_user.to_dict())
-        else:
-            return render_template('user/profile.html')
+        # Get user stats
+        from models import ServiceRequest
+        stats = {
+            'total_requests': ServiceRequest.query.filter_by(user_id=current_user.id).count(),
+            'completed_requests': ServiceRequest.query.filter_by(user_id=current_user.id, status='completed').count()
+        }
+        
+        # Calculate months since joined
+        from datetime import datetime
+        months_since = (datetime.now().year - current_user.created_at.year) * 12 + \
+                      (datetime.now().month - current_user.created_at.month)
+        
+        # Mock data for settings (you should implement your own logic)
+        notification_settings = {
+            'email': [
+                {'id': 'new_request', 'name': 'New Requests', 'description': 'When you submit a new request', 'enabled': True},
+                {'id': 'status_update', 'name': 'Status Updates', 'description': 'When your request status changes', 'enabled': True},
+                {'id': 'artisan_assigned', 'name': 'Artisan Assigned', 'description': 'When an artisan is assigned', 'enabled': True},
+                {'id': 'promotions', 'name': 'Promotions', 'description': 'Special offers and discounts', 'enabled': False}
+            ],
+            'push': [
+                {'id': 'messages', 'name': 'Messages', 'description': 'New messages from artisans', 'enabled': True},
+                {'id': 'reminders', 'name': 'Reminders', 'description': 'Service reminders', 'enabled': True}
+            ],
+            'sms': [
+                {'id': 'urgent', 'name': 'Urgent Updates', 'description': 'Critical service updates', 'enabled': True}
+            ]
+        }
+        
+        privacy_settings = {
+            'profile_visibility': 'artisans',
+            'share_analytics': True,
+            'marketing_emails': False
+        }
+        
+        current_session = {
+            'device': 'Chrome on Windows',
+            'location': 'Lagos, Nigeria',
+            'started': '2 hours ago'
+        }
+        
+        # Add preferences to context
+        preferences = {
+            'default_location': current_user.address if current_user.address else '',
+            'contact_method': 'email'  # Default value
+        }
+        
+        return render_template('user/profile.html',
+                             stats=stats,
+                             member_since=max(1, months_since),
+                             notification_settings=notification_settings,
+                             privacy_settings=privacy_settings,
+                             current_session=current_session,
+                             two_factor_enabled=False,
+                             preferences=preferences)
     
     elif request.method == 'PUT':
         data = request.get_json()
@@ -451,6 +503,44 @@ def profile():
             'message': 'Profile updated successfully',
             'user': current_user.to_dict()
         })
+
+@user_bp.route('/change-password', methods=['POST'])
+@login_required
+def change_password():
+    """Change user password"""
+    data = request.get_json()
     
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+    confirm_password = data.get('confirm_password')
+    
+    if not current_password or not new_password:
+        return jsonify({'error': 'All fields are required'}), 400
+    
+    if new_password != confirm_password:
+        return jsonify({'error': 'Passwords do not match'}), 400
+    
+    if not current_user.check_password(current_password):
+        return jsonify({'error': 'Current password is incorrect'}), 400
+    
+    if len(new_password) < 8:
+        return jsonify({'error': 'Password must be at least 8 characters'}), 400
+    
+    current_user.set_password(new_password)
+    db.session.commit()
+    
+    return jsonify({'message': 'Password updated successfully'})
+
+@user_bp.route('/delete-account', methods=['DELETE'])
+@login_required
+def delete_account():
+    """Delete user account"""
+    # Soft delete - mark as inactive instead of actual deletion
+    current_user.is_active = False
+    db.session.commit()
+    
+    logout_user()
+    return jsonify({'message': 'Account deleted successfully'})
+
 
 

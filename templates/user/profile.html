@@ -1,1 +1,971 @@
-Under Development
+{% extends "base.html" %}
+
+{% block title %}Profile Settings - Uwaila Global{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Breadcrumb Navigation -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('user_bp.dashboard') }}">Dashboard</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Profile Settings</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <!-- Left Column - Profile Info & Navigation -->
+        <div class="col-lg-4 col-xl-3 mb-4">
+            <!-- Profile Card -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body text-center">
+                    <div class="avatar-circle-lg bg-primary text-white mb-3 mx-auto">
+                        <i class="fas fa-user fa-2x"></i>
+                    </div>
+                    <h4 class="card-title mb-1">{{ current_user.full_name }}</h4>
+                    <p class="text-muted small mb-3">{{ current_user.email }}</p>
+                    
+                    <!-- Account Status -->
+                    <div class="account-status mb-3">
+                        <span class="badge bg-{{ 'success' if current_user.is_active else 'danger' }} rounded-pill">
+                            <i class="fas fa-circle me-1"></i>
+                            {{ 'Active' if current_user.is_active else 'Inactive' }}
+                        </span>
+                        {% if current_user.is_verified %}
+                        <span class="badge bg-success rounded-pill ms-2">
+                            <i class="fas fa-check-circle me-1"></i>Verified
+                        </span>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Quick Stats -->
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-number">{{ stats.total_requests }}</span>
+                            <span class="stat-label">Requests</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">{{ stats.completed_requests }}</span>
+                            <span class="stat-label">Completed</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">{{ member_since }}</span>
+                            <span class="stat-label">Months</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Profile Navigation -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-0">
+                    <div class="nav flex-column nav-pills" id="profileTab" role="tablist">
+                        <a class="nav-link active" id="personal-tab" data-bs-toggle="pill" href="#personal" role="tab">
+                            <i class="fas fa-user-circle me-2"></i>Personal Info
+                        </a>
+                        <a class="nav-link" id="security-tab" data-bs-toggle="pill" href="#security" role="tab">
+                            <i class="fas fa-shield-alt me-2"></i>Security
+                        </a>
+                        <a class="nav-link" id="notifications-tab" data-bs-toggle="pill" href="#notifications" role="tab">
+                            <i class="fas fa-bell me-2"></i>Notifications
+                        </a>
+                        <a class="nav-link" id="privacy-tab" data-bs-toggle="pill" href="#privacy" role="tab">
+                            <i class="fas fa-lock me-2"></i>Privacy
+                        </a>
+                        <a class="nav-link" id="preferences-tab" data-bs-toggle="pill" href="#preferences" role="tab">
+                            <i class="fas fa-sliders-h me-2"></i>Preferences
+                        </a>
+                        <hr class="my-2 mx-3">
+                        <a class="nav-link text-danger" href="{{ url_for('user_bp.logout') }}">
+                            <i class="fas fa-sign-out-alt me-2"></i>Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right Column - Profile Content -->
+        <div class="col-lg-8 col-xl-9">
+            <div class="tab-content" id="profileTabContent">
+                <!-- Personal Info Tab -->
+                <div class="tab-pane fade show active" id="personal" role="tabpanel">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="fas fa-user-circle me-2"></i>Personal Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="personalInfoForm">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="fullName" class="form-label">Full Name *</label>
+                                        <input type="text" class="form-control" id="fullName" 
+                                               value="{{ current_user.full_name }}" required>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="email" class="form-label">Email Address *</label>
+                                        <input type="email" class="form-control" id="email" 
+                                               value="{{ current_user.email }}" required>
+                                        {% if not current_user.is_verified %}
+                                        <div class="form-text text-warning">
+                                            <i class="fas fa-exclamation-circle me-1"></i>
+                                            Email not verified. <a href="#" id="verifyEmailLink">Verify now</a>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="phone" class="form-label">Phone Number *</label>
+                                        <input type="tel" class="form-control" id="phone" 
+                                               value="{{ current_user.phone }}" required>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="joinDate" class="form-label">Member Since</label>
+                                        <input type="text" class="form-control" id="joinDate" 
+                                               value="{{ current_user.created_at.strftime('%B %d, %Y') }}" disabled>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="address" class="form-label">Address</label>
+                                    <textarea class="form-control" id="address" rows="3">{{ current_user.address or '' }}</textarea>
+                                    <div class="form-text">Your primary address for service requests</div>
+                                </div>
+                                
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Fields marked with * are required
+                                </div>
+                                
+                                <div class="d-flex justify-content-between">
+                                    <button type="button" class="btn btn-secondary" id="cancelPersonalChanges">
+                                        Cancel
+                                    </button>
+                                    <button type="submit" class="btn btn-primary" id="savePersonalInfo">
+                                        <i class="fas fa-save me-2"></i>Save Changes
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Security Tab -->
+                <div class="tab-pane fade" id="security" role="tabpanel">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Security Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Change Password -->
+                            <div class="mb-5">
+                                <h6 class="mb-3">Change Password</h6>
+                                <form id="changePasswordForm">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="currentPassword" class="form-label">Current Password *</label>
+                                            <div class="input-group">
+                                                <input type="password" class="form-control" id="currentPassword" required>
+                                                <button class="btn btn-outline-secondary" type="button" id="toggleCurrentPassword">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="newPassword" class="form-label">New Password *</label>
+                                            <div class="input-group">
+                                                <input type="password" class="form-control" id="newPassword" required
+                                                       pattern="^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$">
+                                                <button class="btn btn-outline-secondary" type="button" id="toggleNewPassword">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </div>
+                                            <div class="form-text">
+                                                Minimum 8 characters with letters, numbers, and special characters
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="confirmPassword" class="form-label">Confirm New Password *</label>
+                                            <div class="input-group">
+                                                <input type="password" class="form-control" id="confirmPassword" required>
+                                                <button class="btn btn-outline-secondary" type="button" id="toggleConfirmPassword">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </div>
+                                            <div class="form-text" id="passwordMatchMessage"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="alert alert-warning">
+                                        <i class="fas fa-exclamation-triangle me-2"></i>
+                                        Make sure you remember your new password. You'll be logged out after changing it.
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary" id="savePassword">
+                                        <i class="fas fa-key me-2"></i>Update Password
+                                    </button>
+                                </form>
+                            </div>
+                            
+                            <!-- Session Management -->
+                            <div class="mb-4">
+                                <h6 class="mb-3">Active Sessions</h6>
+                                <div class="list-group">
+                                    <div class="list-group-item">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <strong>Current Session</strong>
+                                                <div class="text-muted small">
+                                                    {{ current_session.device }} • {{ current_session.location }}
+                                                </div>
+                                                <div class="text-muted smaller">Started {{ current_session.started }}</div>
+                                            </div>
+                                            <span class="badge bg-success">Active</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <button class="btn btn-outline-danger btn-sm" id="logoutAllDevices">
+                                        <i class="fas fa-sign-out-alt me-1"></i>Logout All Other Devices
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Two-Factor Authentication -->
+                            <div>
+                                <h6 class="mb-3">Two-Factor Authentication</h6>
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <strong>2FA Status</strong>
+                                                <p class="text-muted small mb-0">Add an extra layer of security to your account</p>
+                                            </div>
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="twoFactorToggle" disabled>
+                                                <label class="form-check-label" for="twoFactorToggle">
+                                                    {{ 'Enabled' if two_factor_enabled else 'Disabled' }}
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3">
+                                            <button class="btn btn-outline-primary btn-sm" disabled>
+                                                <i class="fas fa-cog me-1"></i>Setup 2FA (Coming Soon)
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Notifications Tab -->
+                <div class="tab-pane fade" id="notifications" role="tabpanel">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="fas fa-bell me-2"></i>Notification Preferences</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="notificationSettingsForm">
+                                <!-- Email Notifications -->
+                                <div class="mb-4">
+                                    <h6 class="mb-3">Email Notifications</h6>
+                                    <div class="list-group">
+                                        {% for setting in notification_settings.email %}
+                                        <div class="list-group-item border-0">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" 
+                                                       id="email-{{ setting.id }}" 
+                                                       {{ 'checked' if setting.enabled }}>
+                                                <label class="form-check-label" for="email-{{ setting.id }}">
+                                                    <strong>{{ setting.name }}</strong>
+                                                    <p class="text-muted small mb-0">{{ setting.description }}</p>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                
+                                <!-- Push Notifications -->
+                                <div class="mb-4">
+                                    <h6 class="mb-3">Push Notifications</h6>
+                                    <div class="list-group">
+                                        {% for setting in notification_settings.push %}
+                                        <div class="list-group-item border-0">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" 
+                                                       id="push-{{ setting.id }}" 
+                                                       {{ 'checked' if setting.enabled }}>
+                                                <label class="form-check-label" for="push-{{ setting.id }}">
+                                                    <strong>{{ setting.name }}</strong>
+                                                    <p class="text-muted small mb-0">{{ setting.description }}</p>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                
+                                <!-- SMS Notifications -->
+                                <div class="mb-4">
+                                    <h6 class="mb-3">SMS Notifications</h6>
+                                    <div class="list-group">
+                                        {% for setting in notification_settings.sms %}
+                                        <div class="list-group-item border-0">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" 
+                                                       id="sms-{{ setting.id }}" 
+                                                       {{ 'checked' if setting.enabled }}>
+                                                <label class="form-check-label" for="sms-{{ setting.id }}">
+                                                    <strong>{{ setting.name }}</strong>
+                                                    <p class="text-muted small mb-0">{{ setting.description }}</p>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Changes to notification settings are saved automatically
+                                </div>
+                                
+                                <div class="d-flex justify-content-between">
+                                    <button type="button" class="btn btn-secondary" id="resetNotifications">
+                                        Reset to Default
+                                    </button>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Save Settings
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Privacy Tab -->
+                <div class="tab-pane fade" id="privacy" role="tabpanel">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="fas fa-lock me-2"></i>Privacy Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Profile Visibility -->
+                            <div class="mb-4">
+                                <h6 class="mb-3">Profile Visibility</h6>
+                                <div class="mb-3">
+                                    <label for="profileVisibility" class="form-label">Who can see your profile?</label>
+                                    <select class="form-select" id="profileVisibility">
+                                        <option value="public" {{ 'selected' if privacy_settings.profile_visibility == 'public' }}>
+                                            Public (Everyone)
+                                        </option>
+                                        <option value="artisans" {{ 'selected' if privacy_settings.profile_visibility == 'artisans' }}>
+                                            Artisans Only
+                                        </option>
+                                        <option value="private" {{ 'selected' if privacy_settings.profile_visibility == 'private' }}>
+                                            Private (Only Me)
+                                        </option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- Data Sharing -->
+                            <div class="mb-4">
+                                <h6 class="mb-3">Data Sharing</h6>
+                                <div class="list-group">
+                                    <div class="list-group-item border-0">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" 
+                                                   id="shareAnalytics" 
+                                                   {{ 'checked' if privacy_settings.share_analytics }}>
+                                            <label class="form-check-label" for="shareAnalytics">
+                                                <strong>Share anonymous usage data</strong>
+                                                <p class="text-muted small mb-0">Help us improve our services</p>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="list-group-item border-0">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" 
+                                                   id="marketingEmails" 
+                                                   {{ 'checked' if privacy_settings.marketing_emails }}>
+                                            <label class="form-check-label" for="marketingEmails">
+                                                <strong>Marketing communications</strong>
+                                                <p class="text-muted small mb-0">Receive offers and updates</p>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Data Management -->
+                            <div class="mb-4">
+                                <h6 class="mb-3">Data Management</h6>
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h6>Export Your Data</h6>
+                                        <p class="text-muted small mb-3">Download a copy of your personal data</p>
+                                        <button class="btn btn-outline-primary btn-sm" id="exportData">
+                                            <i class="fas fa-download me-1"></i>Request Data Export
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="card bg-light mt-3">
+                                    <div class="card-body">
+                                        <h6 class="text-danger">Delete Account</h6>
+                                        <p class="text-muted small mb-3">Permanently delete your account and all data</p>
+                                        <button class="btn btn-outline-danger btn-sm" id="deleteAccountBtn">
+                                            <i class="fas fa-trash me-1"></i>Delete Account
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="button" class="btn btn-primary" id="savePrivacySettings">
+                                <i class="fas fa-save me-2"></i>Save Privacy Settings
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Preferences Tab -->
+                <div class="tab-pane fade" id="preferences" role="tabpanel">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="fas fa-sliders-h me-2"></i>Preferences</h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Language & Region -->
+                            <div class="mb-4">
+                                <h6 class="mb-3">Language & Region</h6>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="language" class="form-label">Language</label>
+                                        <select class="form-select" id="language">
+                                            <option value="en" selected>English</option>
+                                            <option value="fr">French</option>
+                                            <option value="es">Spanish</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="timezone" class="form-label">Timezone</label>
+                                        <select class="form-select" id="timezone">
+                                            <option value="UTC">UTC</option>
+                                            <option value="Africa/Lagos" selected>West Africa Time (UTC+1)</option>
+                                            <option value="America/New_York">Eastern Time (UTC-5)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Display Preferences -->
+                            <div class="mb-4">
+                                <h6 class="mb-3">Display Preferences</h6>
+                                <div class="list-group">
+                                    <div class="list-group-item border-0">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="darkModeToggle">
+                                            <label class="form-check-label" for="darkModeToggle">
+                                                <strong>Dark Mode</strong>
+                                                <p class="text-muted small mb-0">Switch between light and dark themes</p>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="list-group-item border-0">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="compactViewToggle" checked>
+                                            <label class="form-check-label" for="compactViewToggle">
+                                                <strong>Compact View</strong>
+                                                <p class="text-muted small mb-0">Reduce spacing for more content</p>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Service Preferences -->
+                            <div class="mb-4">
+                                <h6 class="mb-3">Service Preferences</h6>
+                                <div class="mb-3">
+                                    <label for="defaultLocation" class="form-label">Default Service Location</label>
+                                    <input type="text" class="form-control" id="defaultLocation" 
+                                           value="{{ preferences.default_location or '' }}">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Preferred Contact Method</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="contactMethod" 
+                                               id="contactEmail" value="email" checked>
+                                        <label class="form-check-label" for="contactEmail">Email</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="contactMethod" 
+                                               id="contactPhone" value="phone">
+                                        <label class="form-check-label" for="contactPhone">Phone</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="contactMethod" 
+                                               id="contactBoth" value="both">
+                                        <label class="form-check-label" for="contactBoth">Both</label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="button" class="btn btn-primary" id="savePreferences">
+                                <i class="fas fa-save me-2"></i>Save Preferences
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Account Modal -->
+<div class="modal fade" id="deleteAccountModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">Delete Account</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Warning: This action cannot be undone!</strong>
+                </div>
+                
+                <p>Deleting your account will:</p>
+                <ul>
+                    <li>Permanently delete all your personal information</li>
+                    <li>Remove all your service requests and history</li>
+                    <li>Cancel any pending service requests</li>
+                    <li>Delete all your preferences and settings</li>
+                </ul>
+                
+                <div class="mb-3">
+                    <label for="deleteConfirmation" class="form-label">
+                        Type "DELETE" to confirm
+                    </label>
+                    <input type="text" class="form-control" id="deleteConfirmation" 
+                           placeholder="Type DELETE here">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteAccount" disabled>
+                    <i class="fas fa-trash me-1"></i>Delete Account Permanently
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .avatar-circle-lg {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+        color: white;
+        font-size: 1.5rem;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-top: 1rem;
+    }
+    
+    .stat-item {
+        text-align: center;
+        padding: 10px;
+        background: rgba(13, 110, 253, 0.1);
+        border-radius: 8px;
+    }
+    
+    .stat-number {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #0d6efd;
+        display: block;
+    }
+    
+    .stat-label {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+    
+    .nav-pills .nav-link {
+        padding: 12px 20px;
+        border-radius: 8px;
+        margin-bottom: 5px;
+        color: #495057;
+        border-left: 3px solid transparent;
+        transition: all 0.3s;
+    }
+    
+    .nav-pills .nav-link:hover {
+        background-color: rgba(13, 110, 253, 0.1);
+        color: #0d6efd;
+        border-left-color: #0d6efd;
+    }
+    
+    .nav-pills .nav-link.active {
+        background-color: #0d6efd;
+        color: white;
+        border-left-color: #0a58ca;
+    }
+    
+    .nav-pills .nav-link.text-danger:hover {
+        background-color: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+        border-left-color: #dc3545;
+    }
+    
+    .form-switch .form-check-input:checked {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+    
+    .list-group-item {
+        border: none;
+        padding: 12px 0;
+    }
+    
+    .smaller {
+        font-size: 0.85rem;
+    }
+    
+    .card {
+        border-radius: 10px;
+    }
+    
+    .tab-pane {
+        animation: fadeIn 0.3s ease;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    
+    @media (max-width: 768px) {
+        .avatar-circle-lg {
+            width: 80px;
+            height: 80px;
+            font-size: 1.2rem;
+        }
+        
+        .stats-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Toggle password visibility
+        function togglePasswordVisibility(inputId, buttonId) {
+            const input = document.getElementById(inputId);
+            const button = document.getElementById(buttonId);
+            
+            if (button) {
+                button.addEventListener('click', function() {
+                    const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+                    input.setAttribute('type', type);
+                    this.querySelector('i').classList.toggle('fa-eye');
+                    this.querySelector('i').classList.toggle('fa-eye-slash');
+                });
+            }
+        }
+        
+        togglePasswordVisibility('currentPassword', 'toggleCurrentPassword');
+        togglePasswordVisibility('newPassword', 'toggleNewPassword');
+        togglePasswordVisibility('confirmPassword', 'toggleConfirmPassword');
+        
+        // Check password match
+        const newPassword = document.getElementById('newPassword');
+        const confirmPassword = document.getElementById('confirmPassword');
+        const passwordMatchMessage = document.getElementById('passwordMatchMessage');
+        
+        function checkPasswordMatch() {
+            if (newPassword.value && confirmPassword.value) {
+                if (newPassword.value === confirmPassword.value) {
+                    passwordMatchMessage.textContent = 'Passwords match';
+                    passwordMatchMessage.className = 'form-text text-success';
+                } else {
+                    passwordMatchMessage.textContent = 'Passwords do not match';
+                    passwordMatchMessage.className = 'form-text text-danger';
+                }
+            } else {
+                passwordMatchMessage.textContent = '';
+            }
+        }
+        
+        if (newPassword && confirmPassword) {
+            newPassword.addEventListener('input', checkPasswordMatch);
+            confirmPassword.addEventListener('input', checkPasswordMatch);
+        }
+        
+        // Personal Info Form
+        const personalInfoForm = document.getElementById('personalInfoForm');
+        const cancelPersonalChanges = document.getElementById('cancelPersonalChanges');
+        
+        if (personalInfoForm) {
+            personalInfoForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = {
+                    full_name: document.getElementById('fullName').value,
+                    email: document.getElementById('email').value,
+                    phone: document.getElementById('phone').value,
+                    address: document.getElementById('address').value
+                };
+                
+                const saveBtn = document.getElementById('savePersonalInfo');
+                const originalBtnText = saveBtn.innerHTML;
+                
+                saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+                saveBtn.disabled = true;
+                
+                fetch('{{ url_for("user_bp.profile") }}', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert('Error: ' + data.error);
+                    } else {
+                        alert('Profile updated successfully!');
+                        location.reload();
+                    }
+                })
+                .catch(error => {
+                    alert('Error updating profile: ' + error);
+                })
+                .finally(() => {
+                    saveBtn.innerHTML = originalBtnText;
+                    saveBtn.disabled = false;
+                });
+            });
+        }
+        
+        if (cancelPersonalChanges) {
+            cancelPersonalChanges.addEventListener('click', function() {
+                location.reload();
+            });
+        }
+        
+        // Change Password Form
+        const changePasswordForm = document.getElementById('changePasswordForm');
+        
+        if (changePasswordForm) {
+            changePasswordForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const currentPassword = document.getElementById('currentPassword').value;
+                const newPasswordValue = document.getElementById('newPassword').value;
+                const confirmPasswordValue = document.getElementById('confirmPassword').value;
+                
+                if (newPasswordValue !== confirmPasswordValue) {
+                    alert('Passwords do not match');
+                    return;
+                }
+                
+                const saveBtn = document.getElementById('savePassword');
+                const originalBtnText = saveBtn.innerHTML;
+                
+                saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Updating...';
+                saveBtn.disabled = true;
+                
+                fetch('{{ url_for("user_bp.change_password") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        current_password: currentPassword,
+                        new_password: newPasswordValue,
+                        confirm_password: confirmPasswordValue
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert('Error: ' + data.error);
+                    } else {
+                        alert('Password updated successfully! You will be logged out.');
+                        setTimeout(() => {
+                            window.location.href = '{{ url_for("user_bp.logout") }}';
+                        }, 2000);
+                    }
+                })
+                .catch(error => {
+                    alert('Error updating password: ' + error);
+                })
+                .finally(() => {
+                    saveBtn.innerHTML = originalBtnText;
+                    saveBtn.disabled = false;
+                });
+            });
+        }
+        
+        // Delete Account Modal
+        const deleteAccountBtn = document.getElementById('deleteAccountBtn');
+        const deleteAccountModal = new bootstrap.Modal(document.getElementById('deleteAccountModal'));
+        const deleteConfirmation = document.getElementById('deleteConfirmation');
+        const confirmDeleteAccount = document.getElementById('confirmDeleteAccount');
+        
+        if (deleteAccountBtn) {
+            deleteAccountBtn.addEventListener('click', function() {
+                deleteAccountModal.show();
+            });
+        }
+        
+        if (deleteConfirmation) {
+            deleteConfirmation.addEventListener('input', function() {
+                confirmDeleteAccount.disabled = this.value !== 'DELETE';
+            });
+        }
+        
+        if (confirmDeleteAccount) {
+            confirmDeleteAccount.addEventListener('click', function() {
+                if (confirm('Are you absolutely sure? This cannot be undone!')) {
+                    fetch('{{ url_for("user_bp.delete_account") }}', {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            alert('Error: ' + data.error);
+                        } else {
+                            alert('Account deleted successfully');
+                            window.location.href = '{{ url_for('index') }}';
+                        }
+                    })
+                    .catch(error => {
+                        alert('Error deleting account: ' + error);
+                    });
+                }
+            });
+        }
+        
+        // Auto-save toggle switches
+        document.querySelectorAll('.form-switch input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const settingId = this.id;
+                const settingValue = this.checked;
+                
+                // You can implement auto-save functionality here
+                console.log(`Setting ${settingId} changed to ${settingValue}`);
+            });
+        });
+        
+        // Verify Email
+        const verifyEmailLink = document.getElementById('verifyEmailLink');
+        if (verifyEmailLink) {
+            verifyEmailLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                alert('Verification email sent! Please check your inbox.');
+                // Implement email verification logic here
+            });
+        }
+        
+        
+        // Logout All Devices
+        const logoutAllDevices = document.getElementById('logoutAllDevices');
+        if (logoutAllDevices) {
+            logoutAllDevices.addEventListener('click', function() {
+                if (confirm('Logout from all other devices?')) {
+                    fetch('{{ url_for("user_bp.logout") }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            alert('Error: ' + data.error);
+                        } else {
+                            alert('Logged out from all other devices');
+                        }
+                    })
+                    .catch(error => {
+                        alert('Error: ' + error);
+                    });
+                }
+            });
+        }
+        
+        // Export Data
+        const exportData = document.getElementById('exportData');
+        if (exportData) {
+            exportData.addEventListener('click', function() {
+                alert('Data export requested. You will receive an email with your data shortly.');
+                // Implement data export logic here
+            });
+        }
+        
+        // Save buttons for other tabs
+        const savePrivacySettings = document.getElementById('savePrivacySettings');
+        const savePreferences = document.getElementById('savePreferences');
+        
+        if (savePrivacySettings) {
+            savePrivacySettings.addEventListener('click', function() {
+                // Implement privacy settings save logic
+                alert('Privacy settings saved!');
+            });
+        }
+        
+        if (savePreferences) {
+            savePreferences.addEventListener('click', function() {
+                // Implement preferences save logic
+                alert('Preferences saved!');
+            });
+        }
+        
+        // Form auto-save indicators
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+            const inputs = form.querySelectorAll('input, select, textarea');
+            let hasChanges = false;
+            
+            inputs.forEach(input => {
+                input.addEventListener('change', function() {
+                    hasChanges = true;
+                    // You could add a visual indicator here
+                });
+            });
+            
+            form.addEventListener('submit', function() {
+                hasChanges = false;
+            });
+        });
+    });
+</script>
+{% endblock %}
