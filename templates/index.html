@@ -65,19 +65,49 @@
 <!-- Service Categories -->
 <section class="service-categories bg-light py-5">
     <div class="container">
-        <h2 class="text-center mb-5">Service Categories</h2>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0">Service Categories</h2>
+            <a href="{{ url_for('user_bp.services') }}" class="btn btn-outline-primary btn-sm">
+                View All <i class="fas fa-arrow-right ms-1"></i>
+            </a>
+        </div>
+        
         <div class="row g-4">
-            {% for category in categories %}
-            <div class="col-md-3 col-sm-6">
-                <div class="card h-100 border-0 shadow-sm hover-shadow text-center p-3">
-                    <div class="card-icon mb-3">
-                        <i class="fas fa-{{ category.icon|default('tools') }} fa-2x text-primary"></i>
+            {% for category in categories[:8] %}
+            <div class="col-lg-3 col-md-4 col-sm-6">
+                <div class="card h-100 border-0 shadow-sm hover-card">
+                    <div class="card-body text-center p-4">
+                        <div class="category-icon mb-3">
+                            <div class="icon-wrapper">
+                                <i class="fas fa-{{ category.icon|default('tools') }} fa-2x"></i>
+                            </div>
+                        </div>
+                        <h5 class="card-title mb-2">{{ category.name }}</h5>
+                        <p class="card-text text-muted small mb-3">
+                            {{ category.description|default('Professional service')|truncate(70) }}
+                        </p>
+                        <a href="{{ url_for('user_bp.create_service_request') }}?category={{ category.id }}" 
+                           class="btn btn-sm btn-outline-primary stretched-link">
+                            Request Service
+                        </a>
                     </div>
-                    <h5 class="card-title">{{ category.name }}</h5>
-                    <p class="card-text small">{{ category.description|default('Professional service') }}</p>
                 </div>
             </div>
             {% endfor %}
+        </div>
+        
+        <!-- View More Button (hidden on mobile) -->
+        <div class="text-center mt-4 d-none d-md-block">
+            <a href="{{ url_for('user_bp.services') }}" class="btn btn-primary px-4">
+                <i class="fas fa-eye me-2"></i>View All Services
+            </a>
+        </div>
+        
+        <!-- Mobile view more button -->
+        <div class="text-center mt-4 d-block d-md-none">
+            <a href="{{ url_for('user_bp.services') }}" class="btn btn-primary w-100">
+                <i class="fas fa-eye me-2"></i>View All {{ categories|length }} Services
+            </a>
         </div>
     </div>
 </section>

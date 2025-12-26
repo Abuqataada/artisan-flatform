@@ -172,7 +172,6 @@ def dashboard():
                               unread_notifications=unread_notifications)
     
 @user_bp.route('/services')
-@login_required
 def services():
     """View all service categories"""
     from models import ServiceCategory, Artisan, ServiceRequest
