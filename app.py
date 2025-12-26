@@ -24,21 +24,26 @@ def create_app(config_class):
     # Load configuration FIRST
     app.config.from_object(config_class)
     
-    # Configure upload folder - use temp directory in serverless environments
-    if os.environ.get('SERVERLESS') or os.environ.get('FLASK_ENV') == 'production':
-        # Use temp directory in serverless/production
-        app.config['UPLOAD_FOLDER'] = os.path.join(tempfile.gettempdir(), 'uploads')
-    else:
-        # Use local directory in development
-        app.config['UPLOAD_FOLDER'] = 'static/uploads'
-    
+    # File upload configuration
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
     
-    # Initialize Cloudinary if credentials exist
-    if (app.config.get('CLOUDINARY_CLOUD_NAME') and 
-        app.config.get('CLOUDINARY_API_KEY') and 
-        app.config.get('CLOUDINARY_API_SECRET')):
+    # Development: Use local storage
+    if app.config.get('FLASK_ENV') == 'development':
+        app.config['UPLOAD_FOLDER'] = 'static/uploads'
+        app.config['USE_CLOUD_STORAGE'] = False
         
+        # Create local directories
+        try:
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'portfolio'), exist_ok=True)
+        except OSError as e:
+            print(f"Warning: Could not create upload directories: {e}")
+    
+    # Production: Use Cloudinary only
+    else:
+        app.config['USE_CLOUD_STORAGE'] = True
+        
+        # Initialize Cloudinary
         import cloudinary
         cloudinary.config(
             cloud_name=app.config['CLOUDINARY_CLOUD_NAME'],
@@ -46,18 +51,6 @@ def create_app(config_class):
             api_secret=app.config['CLOUDINARY_API_SECRET'],
             secure=True
         )
-        app.config['USE_CLOUD_STORAGE'] = True
-    else:
-        app.config['USE_CLOUD_STORAGE'] = False
-        
-        # Create local directories only in development
-        if app.config.get('FLASK_ENV') == 'development':
-            try:
-                upload_path = app.config['UPLOAD_FOLDER']
-                os.makedirs(os.path.join(upload_path, 'portfolio'), exist_ok=True)
-                os.makedirs(os.path.join(upload_path, 'temp'), exist_ok=True)
-            except OSError as e:
-                print(f"Warning: Could not create upload directories: {e}")
     
     # Initialize extensions
     db.init_app(app)

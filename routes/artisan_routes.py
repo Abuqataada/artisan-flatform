@@ -30,79 +30,89 @@ def allowed_file(filename):
     ext = filename.rsplit('.', 1)[1].lower()
     return ext in ALLOWED_EXTENSIONS
 
-def validate_image_file(file):
-    """Comprehensive validation for image files"""
-    if not file or file.filename == '':
-        return False, "No file selected"
+
+def validate_file(file):
+    """Simple file validation"""
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+    MAX_SIZE = 16 * 1024 * 1024  # 16MB
     
-    if not allowed_file(file.filename):
+    if not file.filename:
+        return False, "No filename"
+    
+    if '.' not in file.filename:
+        return False, "Invalid file"
+    
+    ext = file.filename.rsplit('.', 1)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
         return False, f"File type not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
     
     # Check file size
     file.seek(0, os.SEEK_END)
-    file_length = file.tell()
+    size = file.tell()
     file.seek(0)
     
-    if file_length == 0:
-        return False, "File is empty"
-    
-    if file_length > MAX_FILE_SIZE:
-        size_mb = file_length / (1024 * 1024)
-        return False, f"File too large ({size_mb:.1f}MB). Max: {MAX_FILE_SIZE/(1024*1024)}MB"
+    if size > MAX_SIZE:
+        return False, f"File too large (max 16MB)"
     
     return True, "Valid"
 
-def upload_to_cloudinary(file, artisan_id):
-    """Upload file to Cloudinary with optimized settings"""
+
+def save_image_locally(file, artisan_id):
+    """Save image locally for development"""
     try:
-        # Generate unique filename with timestamp
-        timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S%f')[:-3]
-        original_name = secure_filename(file.filename)
-        name_without_ext = os.path.splitext(original_name)[0]
+        from werkzeug.utils import secure_filename
+        from datetime import datetime
         
-        # Create unique public ID
-        public_id = f"{artisan_id}_{timestamp}_{name_without_ext}"
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        unique_name = f"{artisan_id}_{timestamp}_{filename}"
         
-        # Upload to Cloudinary with optimization
-        result = cloudinary.uploader.upload(
-            file,
-            public_id=public_id,
-            folder=f"artisans/{artisan_id}/portfolio",
-            use_filename=False,  # Use our generated public_id
-            unique_filename=True,
-            overwrite=False,
-            resource_type="auto",
-            transformation=[
-                {'width': 1200, 'crop': 'limit'},  # Responsive sizing
-                {'quality': 'auto:good'},          # Auto quality
-                {'fetch_format': 'auto'}           # Auto format
-            ],
-            tags=[f"artisan_{artisan_id}", "portfolio"]
-        )
+        # Create directory if needed
+        upload_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'portfolio')
+        os.makedirs(upload_dir, exist_ok=True)
         
-        # Return secure URL
-        return {
-            'url': result.get('secure_url'),
-            'public_id': result.get('public_id'),
-            'format': result.get('format'),
-            'bytes': result.get('bytes'),
-            'created_at': result.get('created_at')
-        }
+        # Save file
+        file_path = os.path.join(upload_dir, unique_name)
+        file.save(file_path)
         
-    except cloudinary.exceptions.Error as e:
-        current_app.logger.error(f"Cloudinary upload error: {str(e)}")
-        return None
+        # Return relative URL
+        return f"/static/uploads/portfolio/{unique_name}"
+        
     except Exception as e:
-        current_app.logger.error(f"Unexpected upload error: {str(e)}")
+        print(f"Local save error: {e}")
         return None
 
+
+def upload_to_cloudinary(file, artisan_id):
+    """Upload image to Cloudinary for production"""
+    try:
+        import cloudinary.uploader
+        from datetime import datetime
+        
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        result = cloudinary.uploader.upload(
+            file,
+            folder=f"portfolio/{artisan_id}",
+            public_id=f"{artisan_id}_{timestamp}",
+            transformation=[
+                {'width': 1200, 'crop': 'limit'},
+                {'quality': 'auto:good'}
+            ]
+        )
+        return result['secure_url']
+        
+    except Exception as e:
+        print(f"Cloudinary upload error: {e}")
+        return None
+
+
 def get_portfolio_images(user):
-    """Safely retrieve portfolio images from user"""
+    """Get portfolio images from user"""
     try:
         if user.portfolio_images:
             return json.loads(user.portfolio_images)
-    except (json.JSONDecodeError, TypeError, AttributeError) as e:
-        current_app.logger.warning(f"Error parsing portfolio images: {str(e)}")
+    except:
+        return []
     return []
 
 def save_portfolio_images(user, images):
@@ -540,15 +550,10 @@ def artisan_portfolio():
     """Handle portfolio management - view and upload images"""
     
     if request.method == 'GET':
-        try:
-            portfolio_images = get_portfolio_images(current_user)
-            return render_template('artisan/portfolio.html',
-                                 portfolio_images=portfolio_images,
-                                 max_images=MAX_PORTFOLIO_IMAGES)
-        except Exception as e:
-            current_app.logger.error(f"Error loading portfolio: {str(e)}")
-            flash('Error loading portfolio', 'danger')
-            return render_template('artisan/portfolio.html', portfolio_images=[])
+        portfolio_images = get_portfolio_images(current_user)
+        return render_template('artisan/portfolio.html',
+                             portfolio_images=portfolio_images,
+                             max_images=20)
     
     # POST - Handle file uploads
     if 'portfolio_images' not in request.files:
@@ -556,85 +561,67 @@ def artisan_portfolio():
         return redirect(url_for('artisan_bp.artisan_portfolio'))
     
     files = request.files.getlist('portfolio_images')
-    if not files or len(files) == 0:
+    if not files:
         flash('No files selected', 'danger')
         return redirect(url_for('artisan_bp.artisan_portfolio'))
     
-    uploaded_images = []
+    uploaded_urls = []
     errors = []
-    successful_uploads = 0
     
-    # Check total files being uploaded
-    existing_count = len(get_portfolio_images(current_user))
-    if existing_count + len(files) > MAX_PORTFOLIO_IMAGES:
-        flash(f'You can only have {MAX_PORTFOLIO_IMAGES} images total. '
-              f'You have {existing_count} images currently.', 'warning')
-        # Allow upload but will trim later
+    # Check total images limit
+    existing_images = get_portfolio_images(current_user)
+    if len(existing_images) + len(files) > 20:
+        flash(f'You can only have 20 images total. You have {len(existing_images)} currently.', 'warning')
     
-    for index, file in enumerate(files):
+    for file in files:
         if file and file.filename != '':
             # Validate file
-            is_valid, error_msg = validate_image_file(file)
+            is_valid, error_msg = validate_file(file)
             if not is_valid:
                 errors.append(f"{file.filename}: {error_msg}")
                 continue
             
             try:
-                # Upload to Cloudinary
-                upload_result = upload_to_cloudinary(file, current_user.id)
-                
-                if upload_result and upload_result.get('url'):
-                    uploaded_images.append({
-                        'url': upload_result['url'],
-                        'public_id': upload_result.get('public_id'),
-                        'uploaded_at': datetime.utcnow().isoformat()
-                    })
-                    successful_uploads += 1
+                # Save image based on environment
+                if current_app.config.get('FLASK_ENV') == 'development':
+                    image_url = save_image_locally(file, current_user.id)
                 else:
-                    errors.append(f"{file.filename}: Upload failed")
+                    image_url = upload_to_cloudinary(file, current_user.id)
+                
+                if image_url:
+                    uploaded_urls.append(image_url)
+                else:
+                    errors.append(f"{file.filename}: Failed to save")
                     
             except Exception as e:
-                current_app.logger.error(f"Upload error for {file.filename}: {str(e)}")
-                errors.append(f"{file.filename}: Upload error")
+                errors.append(f"{file.filename}: Error")
+                print(f"Upload error: {e}")
     
     # Process successful uploads
-    if successful_uploads > 0:
+    if uploaded_urls:
+        # Add new images at the beginning
+        all_images = uploaded_urls + existing_images
+        
+        # Limit to 20 images
+        if len(all_images) > 20:
+            all_images = all_images[:20]
+            flash('Portfolio limited to 20 images. Oldest images removed.', 'info')
+        
+        # Save to database
         try:
-            # Get existing images
-            existing_images = get_portfolio_images(current_user)
-            
-            # Add new images at the beginning (newest first)
-            new_portfolio = uploaded_images + existing_images
-            
-            # Limit total images
-            if len(new_portfolio) > MAX_PORTFOLIO_IMAGES:
-                removed_count = len(new_portfolio) - MAX_PORTFOLIO_IMAGES
-                new_portfolio = new_portfolio[:MAX_PORTFOLIO_IMAGES]
-                flash(f'Portfolio limited to {MAX_PORTFOLIO_IMAGES} images. '
-                      f'{removed_count} oldest image(s) removed.', 'info')
-            
-            # Save to database
-            if save_portfolio_images(current_user, new_portfolio):
-                flash(f'Successfully uploaded {successful_uploads} image(s)', 'success')
-            else:
-                flash('Error saving portfolio to database', 'danger')
-                # Note: Images are already uploaded to Cloudinary but not linked
-                
+            current_user.portfolio_images = json.dumps(all_images)
+            db.session.commit()
+            flash(f'Successfully uploaded {len(uploaded_urls)} image(s)', 'success')
         except Exception as e:
-            current_app.logger.error(f"Error updating portfolio: {str(e)}")
-            flash('Error updating portfolio', 'danger')
+            db.session.rollback()
+            flash('Error saving to database', 'danger')
     
-    # Display errors
-    if errors:
-        error_count = len(errors)
-        if error_count <= 3:
-            for error in errors:
-                flash(error, 'warning')
-        else:
-            flash(f'{error_count} files had errors. First few: {", ".join(errors[:3])}', 'warning')
+    # Show errors
+    for error in errors[:5]:  # Show first 5 errors
+        flash(error, 'warning')
     
-    elif successful_uploads == 0:
-        flash('No images were uploaded successfully', 'warning')
+    if not uploaded_urls and not errors:
+        flash('No valid images uploaded', 'warning')
     
     return redirect(url_for('artisan_bp.artisan_portfolio'))
 
