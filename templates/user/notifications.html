@@ -1,1 +1,760 @@
-Under Development
+{% extends "base.html" %}
+
+{% block title %}Notifications - Uwaila Global{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-1">Notifications</h1>
+            <p class="text-muted mb-0">Stay updated with your service requests and account activities</p>
+        </div>
+        <div class="btn-group" role="group">
+            <button class="btn btn-outline-primary" id="markAllRead">
+                <i class="fas fa-check-double me-2"></i>Mark All as Read
+            </button>
+            <button class="btn btn-outline-danger" id="clearAll">
+                <i class="fas fa-trash me-2"></i>Clear All
+            </button>
+        </div>
+    </div>
+
+    <!-- Notification Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card stat-card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">Total</h6>
+                            <h2 class="mb-0">{{ notifications|length }}</h2>
+                        </div>
+                        <i class="fas fa-bell fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card stat-card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">Unread</h6>
+                            <h2 class="mb-0">{{ unread_count }}</h2>
+                        </div>
+                        <i class="fas fa-envelope fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card stat-card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">This Week</h6>
+                            <h2 class="mb-0">{{ this_week_count }}</h2>
+                        </div>
+                        <i class="fas fa-calendar-week fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card stat-card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">Important</h6>
+                            <h2 class="mb-0">{{ important_count }}</h2>
+                        </div>
+                        <i class="fas fa-star fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter and Actions -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <select class="form-select" id="filterStatus">
+                        <option value="all">All Notifications</option>
+                        <option value="unread">Unread Only</option>
+                        <option value="read">Read Only</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" id="filterType">
+                        <option value="all">All Types</option>
+                        <option value="new_request">New Requests</option>
+                        <option value="status_update">Status Updates</option>
+                        <option value="artisan_assigned">Artisan Assigned</option>
+                        <option value="message">Messages</option>
+                        <option value="system">System</option>
+                        <option value="promotion">Promotions</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" id="filterDate">
+                        <option value="all">All Time</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="showOnlyImportant">
+                        <label class="form-check-label" for="showOnlyImportant">
+                            Show Important Only
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications List -->
+    <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">All Notifications</h5>
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" 
+                        data-bs-toggle="dropdown">
+                    <i class="fas fa-cog"></i>
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" id="markAllReadDropdown">Mark All as Read</a></li>
+                    <li><a class="dropdown-item" href="#" id="clearRead">Clear Read Notifications</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#settingsModal">
+                        <i class="fas fa-sliders-h me-2"></i>Notification Settings
+                    </a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card-body p-0">
+            {% if notifications %}
+                <div class="list-group list-group-flush" id="notificationsList">
+                    {% for notification in notifications %}
+                    <div class="list-group-item notification-item {{ 'unread' if not notification.is_read }} 
+                         {{ 'important' if notification.notification_type in ['status_update', 'artisan_assigned'] }}"
+                         data-id="{{ notification.id }}"
+                         data-type="{{ notification.notification_type }}"
+                         data-date="{{ notification.created_at.strftime('%Y-%m-%d') }}"
+                         data-read="{{ notification.is_read|lower }}">
+                        
+                        <div class="d-flex align-items-start">
+                            <!-- Notification Icon -->
+                            <div class="flex-shrink-0">
+                                <div class="notification-icon {{ 
+                                    'bg-primary' if notification.notification_type == 'new_request'
+                                    else 'bg-success' if notification.notification_type == 'status_update'
+                                    else 'bg-info' if notification.notification_type == 'artisan_assigned'
+                                    else 'bg-warning' if notification.notification_type == 'message'
+                                    else 'bg-secondary'
+                                }}">
+                                    <i class="fas {{ 
+                                        'fa-plus-circle' if notification.notification_type == 'new_request'
+                                        else 'fa-sync-alt' if notification.notification_type == 'status_update'
+                                        else 'fa-user-check' if notification.notification_type == 'artisan_assigned'
+                                        else 'fa-comment' if notification.notification_type == 'message'
+                                        else 'fa-bell'
+                                    }}"></i>
+                                </div>
+                            </div>
+                            
+                            <!-- Notification Content -->
+                            <div class="flex-grow-1 ms-3">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <h6 class="mb-0">{{ notification.title }}</h6>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-link text-dark dropdown-toggle p-0" 
+                                                type="button" data-bs-toggle="dropdown">
+                                            <i class="fas fa-ellipsis-v"></i>
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            {% if not notification.is_read %}
+                                            <li>
+                                                <a class="dropdown-item mark-read" href="#" 
+                                                   data-id="{{ notification.id }}">
+                                                    <i class="fas fa-check me-2"></i>Mark as Read
+                                                </a>
+                                            </li>
+                                            {% endif %}
+                                            <li>
+                                                <a class="dropdown-item delete-notification" href="#" 
+                                                   data-id="{{ notification.id }}">
+                                                    <i class="fas fa-trash me-2"></i>Delete
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                
+                                <p class="text-muted mb-2">{{ notification.message }}</p>
+                                
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="badge bg-light text-dark me-2">
+                                            <i class="fas fa-{{ 
+                                                'clock' if notification.notification_type == 'new_request'
+                                                else 'sync' if notification.notification_type == 'status_update'
+                                                else 'user' if notification.notification_type == 'artisan_assigned'
+                                                else 'comment' if notification.notification_type == 'message'
+                                                else 'info-circle'
+                                            }} me-1"></i>
+                                            {{ notification.notification_type|replace('_', ' ')|title }}
+                                        </span>
+                                        <small class="text-muted">
+                                            <i class="far fa-clock me-1"></i>
+                                            <span class="notification-time" 
+                                                  data-time="{{ notification.created_at.isoformat() }}">
+                                                {{ notification.created_at|relative_time }}
+                                            </span>
+                                        </small>
+                                    </div>
+                                    
+                                    {% if notification.related_id %}
+                                    <a href="{{ get_notification_link(notification) }}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        View Details <i class="fas fa-arrow-right ms-1"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <!-- Unread Indicator -->
+                            {% if not notification.is_read %}
+                            <div class="flex-shrink-0 ms-3">
+                                <span class="unread-indicator"></span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- No Notifications Message (hidden by default) -->
+                <div class="d-none" id="noNotificationsMessage">
+                    <div class="text-center py-5">
+                        <i class="fas fa-bell-slash fa-3x text-muted mb-3"></i>
+                        <h5>No notifications found</h5>
+                        <p class="text-muted">Try changing your filters or check back later</p>
+                    </div>
+                </div>
+                
+                <!-- Load More Button -->
+                {% if notifications|length >= 50 %}
+                <div class="card-footer bg-white text-center">
+                    <button class="btn btn-outline-primary" id="loadMoreNotifications">
+                        <i class="fas fa-redo me-2"></i>Load More Notifications
+                    </button>
+                </div>
+                {% endif %}
+                
+            {% else %}
+                <!-- Empty State -->
+                <div class="text-center py-5">
+                    <i class="fas fa-bell fa-3x text-muted mb-3"></i>
+                    <h4>No notifications yet</h4>
+                    <p class="text-muted mb-4">You'll see important updates about your service requests here</p>
+                    <a href="{{ url_for('user_bp.dashboard') }}" class="btn btn-primary">
+                        <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Notification Settings Modal -->
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Notification Settings</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="notificationSettingsForm">
+                        <h6 class="mb-3">Email Notifications</h6>
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="emailNewRequests" checked>
+                                <label class="form-check-label" for="emailNewRequests">
+                                    New service requests
+                                </label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="emailStatusUpdates" checked>
+                                <label class="form-check-label" for="emailStatusUpdates">
+                                    Status updates
+                                </label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="emailArtisanAssigned" checked>
+                                <label class="form-check-label" for="emailArtisanAssigned">
+                                    When artisan is assigned
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <h6 class="mb-3">Push Notifications</h6>
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="pushMessages" checked>
+                                <label class="form-check-label" for="pushMessages">
+                                    New messages
+                                </label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="pushReminders" checked>
+                                <label class="form-check-label" for="pushReminders">
+                                    Service reminders
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <h6 class="mb-3">SMS Notifications</h6>
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="smsUrgent" checked>
+                                <label class="form-check-label" for="smsUrgent">
+                                    Urgent updates only
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveNotificationSettings">
+                        Save Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .stat-card {
+        border-radius: 10px;
+        border: none;
+        transition: transform 0.3s;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .notification-item {
+        padding: 1.25rem;
+        border-left: 4px solid transparent;
+        transition: all 0.2s;
+    }
+    
+    .notification-item.unread {
+        background-color: rgba(13, 110, 253, 0.05);
+        border-left-color: #0d6efd;
+    }
+    
+    .notification-item:hover {
+        background-color: rgba(0, 0, 0, 0.02);
+    }
+    
+    .notification-item.important {
+        border-left-color: #dc3545;
+    }
+    
+    .notification-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    }
+    
+    .unread-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #0d6efd;
+        display: block;
+    }
+    
+    .bg-primary { background-color: #0d6efd !important; }
+    .bg-success { background-color: #198754 !important; }
+    .bg-info { background-color: #0dcaf0 !important; }
+    .bg-warning { background-color: #ffc107 !important; color: #000 !important; }
+    .bg-secondary { background-color: #6c757d !important; }
+    
+    .badge {
+        font-weight: 500;
+    }
+    
+    .dropdown-toggle::after {
+        display: none;
+    }
+    
+    .notification-time {
+        font-size: 0.85rem;
+    }
+    
+    @media (max-width: 768px) {
+        .notification-item {
+            padding: 1rem;
+        }
+        
+        .btn-group .btn {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.875rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Filter notifications
+        const filterStatus = document.getElementById('filterStatus');
+        const filterType = document.getElementById('filterType');
+        const filterDate = document.getElementById('filterDate');
+        const showOnlyImportant = document.getElementById('showOnlyImportant');
+        const notificationItems = document.querySelectorAll('.notification-item');
+        const noNotificationsMessage = document.getElementById('noNotificationsMessage');
+        
+        function filterNotifications() {
+            const statusFilter = filterStatus.value;
+            const typeFilter = filterType.value;
+            const dateFilter = filterDate.value;
+            const importantOnly = showOnlyImportant.checked;
+            const today = new Date();
+            
+            let visibleCount = 0;
+            
+            notificationItems.forEach(item => {
+                let show = true;
+                
+                // Status filter
+                if (statusFilter === 'unread' && item.dataset.read === 'true') {
+                    show = false;
+                } else if (statusFilter === 'read' && item.dataset.read === 'false') {
+                    show = false;
+                }
+                
+                // Type filter
+                if (typeFilter !== 'all' && item.dataset.type !== typeFilter) {
+                    show = false;
+                }
+                
+                // Date filter
+                if (dateFilter !== 'all') {
+                    const itemDate = new Date(item.dataset.date);
+                    
+                    switch(dateFilter) {
+                        case 'today':
+                            if (itemDate.toDateString() !== today.toDateString()) show = false;
+                            break;
+                        case 'week':
+                            const oneWeekAgo = new Date();
+                            oneWeekAgo.setDate(today.getDate() - 7);
+                            if (itemDate < oneWeekAgo) show = false;
+                            break;
+                        case 'month':
+                            const oneMonthAgo = new Date();
+                            oneMonthAgo.setMonth(today.getMonth() - 1);
+                            if (itemDate < oneMonthAgo) show = false;
+                            break;
+                    }
+                }
+                
+                // Important filter
+                if (importantOnly && !item.classList.contains('important')) {
+                    show = false;
+                }
+                
+                if (show) {
+                    item.style.display = '';
+                    visibleCount++;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            // Show/hide no notifications message
+            if (noNotificationsMessage) {
+                if (visibleCount === 0 && notificationItems.length > 0) {
+                    noNotificationsMessage.classList.remove('d-none');
+                } else {
+                    noNotificationsMessage.classList.add('d-none');
+                }
+            }
+        }
+        
+        // Event listeners for filters
+        if (filterStatus) filterStatus.addEventListener('change', filterNotifications);
+        if (filterType) filterType.addEventListener('change', filterNotifications);
+        if (filterDate) filterDate.addEventListener('change', filterNotifications);
+        if (showOnlyImportant) showOnlyImportant.addEventListener('change', filterNotifications);
+        
+        // Mark notification as read
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.mark-read')) {
+                e.preventDefault();
+                const link = e.target.closest('.mark-read');
+                const notificationId = link.dataset.id;
+                const notificationItem = link.closest('.notification-item');
+                
+                fetch(`/user/notifications/${notificationId}/read`, {
+                    method: 'PUT'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        // Update UI
+                        notificationItem.classList.remove('unread');
+                        notificationItem.dataset.read = 'true';
+                        notificationItem.querySelector('.unread-indicator')?.remove();
+                        
+                        // Update unread count in stats
+                        const unreadBadge = document.querySelector('.unread-count');
+                        if (unreadBadge) {
+                            let currentCount = parseInt(unreadBadge.textContent);
+                            if (currentCount > 0) {
+                                unreadBadge.textContent = currentCount - 1;
+                            }
+                        }
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            }
+            
+            // Delete notification
+            if (e.target.closest('.delete-notification')) {
+                e.preventDefault();
+                const link = e.target.closest('.delete-notification');
+                const notificationId = link.dataset.id;
+                const notificationItem = link.closest('.notification-item');
+                
+                if (confirm('Delete this notification?')) {
+                    fetch(`/user/notifications/${notificationId}`, {
+                        method: 'DELETE'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.message) {
+                            notificationItem.style.opacity = '0';
+                            notificationItem.style.transform = 'translateX(-100%)';
+                            setTimeout(() => {
+                                notificationItem.remove();
+                                
+                                // Check if no notifications left
+                                if (document.querySelectorAll('.notification-item').length === 0) {
+                                    location.reload();
+                                }
+                            }, 300);
+                        }
+                    })
+                    .catch(error => console.error('Error:', error));
+                }
+            }
+        });
+        
+        // Mark all as read
+        const markAllReadBtn = document.getElementById('markAllRead');
+        const markAllReadDropdown = document.getElementById('markAllReadDropdown');
+        
+        function markAllAsRead() {
+            if (confirm('Mark all notifications as read?')) {
+                fetch('{{ url_for("user_bp.mark_all_notifications_read") }}', {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        // Update all notifications in UI
+                        document.querySelectorAll('.notification-item.unread').forEach(item => {
+                            item.classList.remove('unread');
+                            item.dataset.read = 'true';
+                            item.querySelector('.unread-indicator')?.remove();
+                        });
+                        
+                        // Update unread count
+                        const unreadBadge = document.querySelector('.unread-count');
+                        if (unreadBadge) {
+                            unreadBadge.textContent = '0';
+                        }
+                        
+                        alert('All notifications marked as read');
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            }
+        }
+        
+        if (markAllReadBtn) markAllReadBtn.addEventListener('click', markAllAsRead);
+        if (markAllReadDropdown) markAllReadDropdown.addEventListener('click', function(e) {
+            e.preventDefault();
+            markAllAsRead();
+        });
+        
+        // Clear all notifications
+        const clearAllBtn = document.getElementById('clearAll');
+        const clearReadBtn = document.getElementById('clearRead');
+        
+        if (clearAllBtn) {
+            clearAllBtn.addEventListener('click', function() {
+                if (confirm('Clear all notifications? This action cannot be undone.')) {
+                    fetch('{{ url_for("user_bp.clear_all_notifications") }}', {
+                        method: 'DELETE'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.message) {
+                            alert('All notifications cleared');
+                            location.reload();
+                        }
+                    })
+                    .catch(error => console.error('Error:', error));
+                }
+            });
+        }
+        
+        if (clearReadBtn) {
+            clearReadBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (confirm('Clear all read notifications?')) {
+                    fetch('{{ url_for("user_bp.clear_read_notifications") }}', {
+                        method: 'DELETE'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.message) {
+                            // Remove all read notifications from UI
+                            document.querySelectorAll('.notification-item[data-read="true"]').forEach(item => {
+                                item.remove();
+                            });
+                            
+                            // Check if no notifications left
+                            if (document.querySelectorAll('.notification-item').length === 0) {
+                                location.reload();
+                            }
+                        }
+                    })
+                    .catch(error => console.error('Error:', error));
+                }
+            });
+        }
+        
+        // Auto-update notification times
+        function updateRelativeTimes() {
+            document.querySelectorAll('.notification-time').forEach(element => {
+                const timeString = element.getAttribute('data-time');
+                if (timeString) {
+                    const time = new Date(timeString);
+                    const now = new Date();
+                    const diff = now - time;
+                    
+                    let relativeTime;
+                    if (diff < 60000) { // Less than 1 minute
+                        relativeTime = 'Just now';
+                    } else if (diff < 3600000) { // Less than 1 hour
+                        const minutes = Math.floor(diff / 60000);
+                        relativeTime = `${minutes}m ago`;
+                    } else if (diff < 86400000) { // Less than 1 day
+                        const hours = Math.floor(diff / 3600000);
+                        relativeTime = `${hours}h ago`;
+                    } else if (diff < 604800000) { // Less than 1 week
+                        const days = Math.floor(diff / 86400000);
+                        relativeTime = `${days}d ago`;
+                    } else {
+                        relativeTime = time.toLocaleDateString();
+                    }
+                    
+                    element.textContent = relativeTime;
+                }
+            });
+        }
+        
+        // Update times initially and every minute
+        updateRelativeTimes();
+        setInterval(updateRelativeTimes, 60000);
+        
+        // Load more notifications
+        const loadMoreBtn = document.getElementById('loadMoreNotifications');
+        if (loadMoreBtn) {
+            loadMoreBtn.addEventListener('click', function() {
+                const currentCount = document.querySelectorAll('.notification-item').length;
+                
+                fetch(`{{ url_for("user_bp.get_notifications") }}?offset=${currentCount}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.notifications && data.notifications.length > 0) {
+                            // Add new notifications to the list
+                            // You would need to implement this based on your data structure
+                            alert('Load more functionality would be implemented here');
+                        } else {
+                            loadMoreBtn.disabled = true;
+                            loadMoreBtn.textContent = 'No more notifications';
+                        }
+                    })
+                    .catch(error => console.error('Error:', error));
+            });
+        }
+        
+        // Save notification settings
+        const saveSettingsBtn = document.getElementById('saveNotificationSettings');
+        if (saveSettingsBtn) {
+            saveSettingsBtn.addEventListener('click', function() {
+                const settings = {
+                    email_new_requests: document.getElementById('emailNewRequests').checked,
+                    email_status_updates: document.getElementById('emailStatusUpdates').checked,
+                    email_artisan_assigned: document.getElementById('emailArtisanAssigned').checked,
+                    push_messages: document.getElementById('pushMessages').checked,
+                    push_reminders: document.getElementById('pushReminders').checked,
+                    sms_urgent: document.getElementById('smsUrgent').checked
+                };
+                
+                fetch('{{ url_for("user_bp.update_notification_settings") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(settings)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        alert('Notification settings saved');
+                        bootstrap.Modal.getInstance(document.getElementById('settingsModal')).hide();
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            });
+        }
+        
+        // Auto-refresh notifications every 30 seconds
+        setInterval(function() {
+            fetch('{{ url_for("user_bp.get_notifications") }}?count_only=true')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.unread_count !== {{ unread_count }}) {
+                        // If unread count changed, refresh the page
+                        location.reload();
+                    }
+                });
+        }, 30000);
+    });
+</script>
+{% endblock %}

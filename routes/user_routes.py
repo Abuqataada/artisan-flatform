@@ -371,7 +371,7 @@ def get_categories():
     return jsonify({'categories': [cat.to_dict() for cat in categories]})
 
 # Notification Routes
-@user_bp.route('/notifications')
+@user_bp.route('/notifications', methods=['GET'])
 @login_required
 def get_notifications():
     """Get user notifications"""
@@ -396,14 +396,37 @@ def get_notifications():
         user_type='user'
     ).order_by(Notification.created_at.desc()).all()
     
-    if request.is_json:
-        return jsonify({'notifications': [n.to_dict() for n in notifications]})
-    else:
-        return render_template('user/notifications.html', notifications=notifications)
+    # Calculate stats
+    unread_count = sum(1 for n in notifications if not n.is_read)
     
+    # This week count
+    from datetime import datetime, timedelta
+    week_ago = datetime.now() - timedelta(days=7)
+    this_week_count = sum(1 for n in notifications if n.created_at >= week_ago)
+    
+    # Important notifications (status updates and artisan assigned)
+    important_count = sum(1 for n in notifications if n.notification_type in ['status_update', 'artisan_assigned'])
+    
+    if request.is_json:
+        return jsonify({
+            'notifications': [n.to_dict() for n in notifications],
+            'stats': {
+                'unread_count': unread_count,
+                'this_week_count': this_week_count,
+                'important_count': important_count
+            }
+        })
+    else:
+        return render_template('user/notifications.html',
+                             notifications=notifications,
+                             unread_count=unread_count,
+                             this_week_count=this_week_count,
+                             important_count=important_count)
+
 @user_bp.route('/notifications/<notification_id>/read', methods=['PUT'])
 @login_required
 def mark_notification_read(notification_id):
+    """Mark a notification as read"""
     notification = Notification.query.get_or_404(notification_id)
     
     if notification.user_id != current_user.id:
@@ -413,6 +436,91 @@ def mark_notification_read(notification_id):
     db.session.commit()
     
     return jsonify({'message': 'Notification marked as read'})
+
+@user_bp.route('/notifications/mark-all-read', methods=['POST'])
+@login_required
+def mark_all_notifications_read():
+    """Mark all notifications as read"""
+    notifications = Notification.query.filter_by(
+        user_id=current_user.id,
+        user_type='user',
+        is_read=False
+    ).all()
+    
+    for notification in notifications:
+        notification.is_read = True
+    
+    db.session.commit()
+    
+    return jsonify({
+        'message': f'{len(notifications)} notifications marked as read',
+        'count': len(notifications)
+    })
+
+@user_bp.route('/notifications/<notification_id>', methods=['DELETE'])
+@login_required
+def delete_notification(notification_id):
+    """Delete a notification"""
+    notification = Notification.query.get_or_404(notification_id)
+    
+    if notification.user_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    db.session.delete(notification)
+    db.session.commit()
+    
+    return jsonify({'message': 'Notification deleted'})
+
+@user_bp.route('/notifications/clear-read', methods=['DELETE'])
+@login_required
+def clear_read_notifications():
+    """Clear all read notifications"""
+    notifications = Notification.query.filter_by(
+        user_id=current_user.id,
+        user_type='user',
+        is_read=True
+    ).all()
+    
+    count = len(notifications)
+    for notification in notifications:
+        db.session.delete(notification)
+    
+    db.session.commit()
+    
+    return jsonify({
+        'message': f'{count} read notifications cleared',
+        'count': count
+    })
+
+@user_bp.route('/notifications/clear-all', methods=['DELETE'])
+@login_required
+def clear_all_notifications():
+    """Clear all notifications"""
+    notifications = Notification.query.filter_by(
+        user_id=current_user.id,
+        user_type='user'
+    ).all()
+    
+    count = len(notifications)
+    for notification in notifications:
+        db.session.delete(notification)
+    
+    db.session.commit()
+    
+    return jsonify({
+        'message': f'{count} notifications cleared',
+        'count': count
+    })
+
+@user_bp.route('/notifications/settings', methods=['POST'])
+@login_required
+def update_notification_settings():
+    """Update notification settings"""
+    data = request.get_json()
+    
+    # You would save these to UserSettings model
+    # For now, just acknowledge
+    return jsonify({'message': 'Notification settings updated'})
 
 # Profile Management
 @user_bp.route('/profile', methods=['GET', 'PUT'])

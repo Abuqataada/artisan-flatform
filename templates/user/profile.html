@@ -895,22 +895,20 @@
             });
         }
         
-        
+
         // Logout All Devices
         const logoutAllDevices = document.getElementById('logoutAllDevices');
         if (logoutAllDevices) {
             logoutAllDevices.addEventListener('click', function() {
                 if (confirm('Logout from all other devices?')) {
                     fetch('{{ url_for("user_bp.logout") }}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
+                        method: 'GET'
                     })
                     .then(response => response.json())
                     .then(data => {
                         if (data.error) {
                             alert('Error: ' + data.error);
+                            console.error(data.error);
                         } else {
                             alert('Logged out from all other devices');
                         }

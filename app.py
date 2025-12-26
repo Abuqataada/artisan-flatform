@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, url_for
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_cors import CORS
@@ -208,6 +208,24 @@ def create_app(config_class):
             return Artisan.query.filter_by(category=category_name, is_active=True, is_verified=True).count()
         
         return dict(get_artisan_count=get_artisan_count)
+    
+    # Add context processor for helper function
+    @app.context_processor
+    def utility_processor():
+        def get_notification_link(notification):
+            """Get appropriate link for notification"""
+            if notification.notification_type == 'new_request' and notification.related_id:
+                return url_for('user_bp.view_request', request_id=notification.related_id)
+            elif notification.notification_type == 'status_update' and notification.related_id:
+                return url_for('user_bp.view_request', request_id=notification.related_id)
+            elif notification.notification_type == 'artisan_assigned' and notification.related_id:
+                return url_for('user_bp.view_request', request_id=notification.related_id)
+            elif notification.notification_type == 'message' and notification.related_id:
+                return '#'  # Would link to messages
+            else:
+                return '#'
+        
+        return dict(get_notification_link=get_notification_link)
 
     # Custom Jinja2 filters
     @app.template_filter('nl2br')
