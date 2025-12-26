@@ -199,7 +199,36 @@ def create_app(config_class):
     login_manager.login_view = 'user_bp.login'
     login_manager.login_message_category = 'info'
     
+    # Add context processor for helper functions
+    @app.context_processor
+    def utility_processor():
+        def get_artisan_count(category_name):
+            """Get count of artisans in a category"""
+            from models import Artisan
+            return Artisan.query.filter_by(category=category_name, is_active=True, is_verified=True).count()
+        
+        return dict(get_artisan_count=get_artisan_count)
+
     # Custom Jinja2 filters
+    @app.template_filter('nl2br')
+    def nl2br_filter(text):
+        """Convert newlines to <br> tags for HTML display"""
+        if not text:
+            return ''
+        return text.replace('\n', '<br>')
+
+    @app.template_filter('number_format')
+    def number_format_filter(value, decimals=2):
+        """Format number with commas"""
+        if value is None:
+            return "0.00"
+        return f"{value:,.{decimals}f}"
+
+    @app.template_filter('yesno')
+    def yesno_filter(value, yes='Yes', no='No'):
+        """Convert boolean to Yes/No"""
+        return yes if value else no
+
     @app.template_filter('relative_time')
     def relative_time_filter(dt):
         """Convert datetime to relative time string"""
@@ -271,6 +300,9 @@ def create_app(config_class):
     app.jinja_env.filters['format_date'] = format_date_filter
     app.jinja_env.filters['format_datetime'] = format_datetime_filter
     app.jinja_env.filters['truncate'] = truncate_filter
+    app.jinja_env.filters['nl2br'] = nl2br_filter
+    app.jinja_env.filters['number_format'] = number_format_filter
+    app.jinja_env.filters['yesno'] = yesno_filter
     
     @login_manager.user_loader
     def load_user(user_id):

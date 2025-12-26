@@ -175,8 +175,23 @@ def dashboard():
 @login_required
 def services():
     """View all service categories"""
-    categories = ServiceCategory.query.filter_by(is_active=True).all()
-    return render_template('user/services.html', categories=categories)
+    from models import ServiceCategory, Artisan, ServiceRequest
+    
+    categories = ServiceCategory.query.filter_by(is_active=True).order_by(ServiceCategory.name).all()
+    
+    # Get popular categories (you can implement your own logic)
+    popular_categories = ServiceCategory.query.filter_by(is_active=True).limit(8).all()
+    
+    # Get stats for display
+    active_artisans = Artisan.query.filter_by(is_active=True, is_verified=True).count()
+    completed_jobs = ServiceRequest.query.filter_by(status='completed').count()
+    
+    return render_template('user/services.html',
+                         categories=categories,
+                         popular_categories=popular_categories,
+                         active_artisans=active_artisans,
+                         completed_jobs=completed_jobs)
+
 
 @user_bp.route('/request/<request_id>')
 @login_required
@@ -187,7 +202,7 @@ def view_request(request_id):
     # Ensure user owns this request
     if service_request.user_id != current_user.id and not isinstance(current_user, Admin):
         flash('Unauthorized access', 'danger')
-        return redirect(url_for('user_bp.dashboard'))
+        return redirect(url_for('user_bp.my_requests'))
     
     return render_template('user/view_request.html', request=service_request)
 

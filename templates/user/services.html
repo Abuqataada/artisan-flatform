@@ -1,1 +1,774 @@
-Under Development
+{% extends "base.html" %}
+
+{% block title %}Our Services - Uwaila Global{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="page-header mb-4">
+        <div class="row align-items-center">
+            <div class="col">
+                <h1 class="h2 mb-1">Our Services</h1>
+                <p class="text-muted mb-0">Browse and select from our wide range of professional services</p>
+            </div>
+            <div class="col-auto">
+                <a href="{{ url_for('user_bp.create_service_request') }}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Request Service
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Service Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card stat-card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">Total Services</h6>
+                            <h2 class="mb-0">{{ categories|length }}</h2>
+                        </div>
+                        <i class="fas fa-concierge-bell fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card stat-card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">Popular</h6>
+                            <h2 class="mb-0">{{ popular_categories|length }}</h2>
+                        </div>
+                        <i class="fas fa-fire fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card stat-card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">Active Artisans</h6>
+                            <h2 class="mb-0">{{ active_artisans }}</h2>
+                        </div>
+                        <i class="fas fa-user-tie fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card stat-card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">Completed Jobs</h6>
+                            <h2 class="mb-0">{{ completed_jobs }}</h2>
+                        </div>
+                        <i class="fas fa-check-circle fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filter -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-8">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0">
+                            <i class="fas fa-search text-muted"></i>
+                        </span>
+                        <input type="text" class="form-control border-start-0" id="searchServices" 
+                               placeholder="Search services by name or description...">
+                        <button class="btn btn-primary" type="button" id="searchBtn">
+                            <i class="fas fa-search me-1"></i>Search
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <select class="form-select" id="categoryFilter">
+                        <option value="all">All Categories</option>
+                        <option value="construction">Construction & Building</option>
+                        <option value="electrical">Electrical Services</option>
+                        <option value="plumbing">Plumbing Services</option>
+                        <option value="hvac">HVAC & Cooling</option>
+                        <option value="home">Home Services</option>
+                        <option value="automotive">Mechanical & Automotive</option>
+                        <option value="technology">Technology & IT</option>
+                        <option value="furniture">Furniture & Interior</option>
+                        <option value="metal">Metal Work</option>
+                        <option value="beauty">Beauty & Personal Care</option>
+                        <option value="event">Event Services</option>
+                        <option value="professional">Professional Services</option>
+                        <option value="health">Health & Wellness</option>
+                        <option value="logistics">Logistics & Delivery</option>
+                        <option value="other">Other Services</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Service Categories Grid -->
+    <div class="row mb-5">
+        <!-- Construction & Building -->
+        <div class="col-12 mb-4">
+            <div class="category-header">
+                <h3 class="mb-3"><i class="fas fa-hard-hat me-2"></i>🏗️ Construction & Building</h3>
+                <p class="text-muted mb-4">Professional construction, renovation, and building services</p>
+            </div>
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4">
+                {% for category in categories if category.name in [
+                    'Masonry', 'Carpentry', 'Roofing', 'Tiling', 'Painting', 
+                    'Drywall', 'Steel Fabrication', 'Glass Work'
+                ] %}
+                <div class="col">
+                    <div class="card service-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start mb-3">
+                                <div class="service-icon">
+                                    <i class="fas fa-{{ category.icon|default('tools') }}"></i>
+                                </div>
+                                <div class="ms-3">
+                                    <h5 class="card-title mb-1">{{ category.name }}</h5>
+                                    <p class="text-muted small mb-0">{{ category.description|truncate(80) }}</p>
+                                </div>
+                            </div>
+                            <div class="service-stats">
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <small class="text-muted d-block">Artisans</small>
+                                        <strong>{{ get_artisan_count(category.name) }}</strong>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted d-block">Avg. Rating</small>
+                                        <div class="stars small">
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star-half-alt text-warning"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white border-0">
+                            <a href="{{ url_for('user_bp.create_service_request') }}?category={{ category.id }}" 
+                               class="btn btn-outline-primary w-100">
+                                <i class="fas fa-plus me-2"></i>Request Service
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Electrical Services -->
+        <div class="col-12 mb-4">
+            <div class="category-header">
+                <h3 class="mb-3"><i class="fas fa-bolt me-2"></i>⚡ Electrical Services</h3>
+                <p class="text-muted mb-4">Electrical installations, repairs, and maintenance</p>
+            </div>
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4">
+                {% for category in categories if category.name in [
+                    'Electrical Wiring', 'Lighting', 'Generator Repair', 'Solar Installation',
+                    'Inverter Systems', 'Security Systems', 'Home Automation'
+                ] %}
+                <div class="col">
+                    <div class="card service-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start mb-3">
+                                <div class="service-icon bg-warning">
+                                    <i class="fas fa-{{ category.icon|default('bolt') }}"></i>
+                                </div>
+                                <div class="ms-3">
+                                    <h5 class="card-title mb-1">{{ category.name }}</h5>
+                                    <p class="text-muted small mb-0">{{ category.description|truncate(80) }}</p>
+                                </div>
+                            </div>
+                            <div class="service-stats">
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <small class="text-muted d-block">Artisans</small>
+                                        <strong>{{ get_artisan_count(category.name) }}</strong>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted d-block">Avg. Rating</small>
+                                        <div class="stars small">
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white border-0">
+                            <a href="{{ url_for('user_bp.create_service_request') }}?category={{ category.id }}" 
+                               class="btn btn-outline-warning w-100">
+                                <i class="fas fa-plus me-2"></i>Request Service
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Plumbing Services -->
+        <div class="col-12 mb-4">
+            <div class="category-header">
+                <h3 class="mb-3"><i class="fas fa-faucet me-2"></i>🚰 Plumbing Services</h3>
+                <p class="text-muted mb-4">Water systems, drainage, and plumbing solutions</p>
+            </div>
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4">
+                {% for category in categories if category.name in [
+                    'Plumbing', 'Pipe Fitting', 'Water Heater', 'Borehole',
+                    'Water Treatment', 'Septic Tank', 'Drainage'
+                ] %}
+                <div class="col">
+                    <div class="card service-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start mb-3">
+                                <div class="service-icon bg-info">
+                                    <i class="fas fa-{{ category.icon|default('faucet') }}"></i>
+                                </div>
+                                <div class="ms-3">
+                                    <h5 class="card-title mb-1">{{ category.name }}</h5>
+                                    <p class="text-muted small mb-0">{{ category.description|truncate(80) }}</p>
+                                </div>
+                            </div>
+                            <div class="service-stats">
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <small class="text-muted d-block">Artisans</small>
+                                        <strong>{{ get_artisan_count(category.name) }}</strong>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted d-block">Avg. Rating</small>
+                                        <div class="stars small">
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star-half-alt text-warning"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white border-0">
+                            <a href="{{ url_for('user_bp.create_service_request') }}?category={{ category.id }}" 
+                               class="btn btn-outline-info w-100">
+                                <i class="fas fa-plus me-2"></i>Request Service
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- HVAC & Cooling -->
+        <div class="col-12 mb-4">
+            <div class="category-header">
+                <h3 class="mb-3"><i class="fas fa-snowflake me-2"></i>❄️ HVAC & Cooling</h3>
+                <p class="text-muted mb-4">Air conditioning, ventilation, and cooling systems</p>
+            </div>
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4">
+                {% for category in categories if category.name in [
+                    'AC Installation', 'AC Repair', 'AC Maintenance', 
+                    'Refrigeration', 'Ventilation', 'Cold Room'
+                ] %}
+                <div class="col">
+                    <div class="card service-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start mb-3">
+                                <div class="service-icon bg-primary">
+                                    <i class="fas fa-{{ category.icon|default('snowflake') }}"></i>
+                                </div>
+                                <div class="ms-3">
+                                    <h5 class="card-title mb-1">{{ category.name }}</h5>
+                                    <p class="text-muted small mb-0">{{ category.description|truncate(80) }}</p>
+                                </div>
+                            </div>
+                            <div class="service-stats">
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <small class="text-muted d-block">Artisans</small>
+                                        <strong>{{ get_artisan_count(category.name) }}</strong>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted d-block">Avg. Rating</small>
+                                        <div class="stars small">
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white border-0">
+                            <a href="{{ url_for('user_bp.create_service_request') }}?category={{ category.id }}" 
+                               class="btn btn-outline-primary w-100">
+                                <i class="fas fa-plus me-2"></i>Request Service
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Home Services -->
+        <div class="col-12 mb-4">
+            <div class="category-header">
+                <h3 class="mb-3"><i class="fas fa-home me-2"></i>🏠 Home Services</h3>
+                <p class="text-muted mb-4">Household maintenance and domestic services</p>
+            </div>
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4">
+                {% for category in categories if category.name in [
+                    'Cleaning', 'Pest Control', 'Laundry', 'Gardening', 
+                    'Home Organizing', 'Moving'
+                ] %}
+                <div class="col">
+                    <div class="card service-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start mb-3">
+                                <div class="service-icon bg-success">
+                                    <i class="fas fa-{{ category.icon|default('home') }}"></i>
+                                </div>
+                                <div class="ms-3">
+                                    <h5 class="card-title mb-1">{{ category.name }}</h5>
+                                    <p class="text-muted small mb-0">{{ category.description|truncate(80) }}</p>
+                                </div>
+                            </div>
+                            <div class="service-stats">
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <small class="text-muted d-block">Artisans</small>
+                                        <strong>{{ get_artisan_count(category.name) }}</strong>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted d-block">Avg. Rating</small>
+                                        <div class="stars small">
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star-half-alt text-warning"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white border-0">
+                            <a href="{{ url_for('user_bp.create_service_request') }}?category={{ category.id }}" 
+                               class="btn btn-outline-success w-100">
+                                <i class="fas fa-plus me-2"></i>Request Service
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Popular Services Section -->
+        <div class="col-12 mb-4">
+            <div class="category-header">
+                <h3 class="mb-3"><i class="fas fa-fire me-2 text-danger"></i>🔥 Most Popular Services</h3>
+                <p class="text-muted mb-4">Our most requested services by customers</p>
+            </div>
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4">
+                {% for category in popular_categories[:8] %}
+                <div class="col">
+                    <div class="card service-card h-100 border-danger">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start mb-3">
+                                <div class="service-icon bg-danger">
+                                    <i class="fas fa-{{ category.icon|default('fire') }}"></i>
+                                </div>
+                                <div class="ms-3">
+                                    <h5 class="card-title mb-1">{{ category.name }}</h5>
+                                    <p class="text-muted small mb-0">{{ category.description|truncate(80) }}</p>
+                                    <span class="badge bg-danger mt-2">
+                                        <i class="fas fa-fire me-1"></i>Popular
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="service-stats">
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <small class="text-muted d-block">Artisans</small>
+                                        <strong>{{ get_artisan_count(category.name) }}</strong>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted d-block">Avg. Rating</small>
+                                        <div class="stars small">
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                            <i class="fas fa-star text-warning"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white border-0">
+                            <a href="{{ url_for('user_bp.create_service_request') }}?category={{ category.id }}" 
+                               class="btn btn-danger w-100">
+                                <i class="fas fa-plus me-2"></i>Request Service
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- How It Works -->
+    <div class="card mb-5">
+        <div class="card-body text-center py-5">
+            <h2 class="mb-4">How It Works</h2>
+            <div class="row">
+                <div class="col-md-4 mb-4">
+                    <div class="step-icon mx-auto mb-3">
+                        <div class="step-number">1</div>
+                        <i class="fas fa-search fa-2x"></i>
+                    </div>
+                    <h5>Browse Services</h5>
+                    <p class="text-muted">Find the service you need from our extensive catalog</p>
+                </div>
+                <div class="col-md-4 mb-4">
+                    <div class="step-icon mx-auto mb-3">
+                        <div class="step-number">2</div>
+                        <i class="fas fa-edit fa-2x"></i>
+                    </div>
+                    <h5>Submit Request</h5>
+                    <p class="text-muted">Fill out the service request form with your requirements</p>
+                </div>
+                <div class="col-md-4 mb-4">
+                    <div class="step-icon mx-auto mb-3">
+                        <div class="step-number">3</div>
+                        <i class="fas fa-user-tie fa-2x"></i>
+                    </div>
+                    <h5>Get Matched</h5>
+                    <p class="text-muted">We'll match you with a qualified artisan for the job</p>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-4 offset-md-2 mb-4">
+                    <div class="step-icon mx-auto mb-3">
+                        <div class="step-number">4</div>
+                        <i class="fas fa-tools fa-2x"></i>
+                    </div>
+                    <h5>Service Delivery</h5>
+                    <p class="text-muted">The artisan completes the service professionally</p>
+                </div>
+                <div class="col-md-4 mb-4">
+                    <div class="step-icon mx-auto mb-3">
+                        <div class="step-number">5</div>
+                        <i class="fas fa-star fa-2x"></i>
+                    </div>
+                    <h5>Rate & Review</h5>
+                    <p class="text-muted">Share your experience to help others</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Call to Action -->
+    <div class="card bg-primary text-white">
+        <div class="card-body text-center py-5">
+            <h2 class="mb-3">Ready to Get Started?</h2>
+            <p class="mb-4">Find the perfect service for your needs or explore our full catalog</p>
+            <div class="d-flex justify-content-center gap-3">
+                <a href="{{ url_for('user_bp.create_service_request') }}" class="btn btn-light btn-lg">
+                    <i class="fas fa-plus me-2"></i>Request a Service
+                </a>
+                <a href="{{ url_for('user_bp.dashboard') }}" class="btn btn-outline-light btn-lg">
+                    <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .page-header {
+        background: white;
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .stat-card {
+        border-radius: 10px;
+        border: none;
+        transition: transform 0.3s;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .category-header {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin-bottom: 1.5rem;
+        border-left: 4px solid #0d6efd;
+    }
+    
+    .service-card {
+        border: 1px solid #dee2e6;
+        border-radius: 10px;
+        transition: all 0.3s;
+    }
+    
+    .service-card:hover {
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        transform: translateY(-5px);
+        border-color: #0d6efd;
+    }
+    
+    .service-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
+        background: rgba(13, 110, 253, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #0d6efd;
+        font-size: 1.2rem;
+    }
+    
+    .service-icon.bg-warning {
+        background: rgba(255, 193, 7, 0.1);
+        color: #ffc107;
+    }
+    
+    .service-icon.bg-info {
+        background: rgba(13, 202, 240, 0.1);
+        color: #0dcaf0;
+    }
+    
+    .service-icon.bg-success {
+        background: rgba(25, 135, 84, 0.1);
+        color: #198754;
+    }
+    
+    .service-icon.bg-danger {
+        background: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+    }
+    
+    .service-stats {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-top: 1rem;
+    }
+    
+    .stars {
+        color: #ffc107;
+        font-size: 0.9rem;
+    }
+    
+    .step-icon {
+        position: relative;
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: rgba(13, 110, 253, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #0d6efd;
+        margin-bottom: 1rem;
+    }
+    
+    .step-number {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        width: 30px;
+        height: 30px;
+        background: #0d6efd;
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 0.9rem;
+    }
+    
+    .card.border-danger {
+        border: 2px solid #dc3545;
+    }
+    
+    .input-group .form-control:focus {
+        box-shadow: none;
+        border-color: #0d6efd;
+    }
+    
+    @media (max-width: 768px) {
+        .page-header {
+            padding: 1.5rem;
+        }
+        
+        .category-header {
+            padding: 1rem;
+        }
+        
+        .service-card {
+            margin-bottom: 1rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Search functionality
+        const searchInput = document.getElementById('searchServices');
+        const searchBtn = document.getElementById('searchBtn');
+        const categoryFilter = document.getElementById('categoryFilter');
+        const serviceCards = document.querySelectorAll('.service-card');
+        
+        function filterServices() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const selectedCategory = categoryFilter.value;
+            
+            serviceCards.forEach(card => {
+                const categoryName = card.querySelector('.card-title').textContent.toLowerCase();
+                const categoryDesc = card.querySelector('.text-muted').textContent.toLowerCase();
+                const categoryGroup = getCategoryGroup(categoryName);
+                
+                let show = true;
+                
+                // Search filter
+                if (searchTerm && !categoryName.includes(searchTerm) && !categoryDesc.includes(searchTerm)) {
+                    show = false;
+                }
+                
+                // Category filter
+                if (selectedCategory !== 'all' && categoryGroup !== selectedCategory) {
+                    show = false;
+                }
+                
+                // Show/hide parent column
+                const parentCol = card.closest('.col');
+                if (parentCol) {
+                    parentCol.style.display = show ? '' : 'none';
+                }
+            });
+            
+            // Hide empty category sections
+            document.querySelectorAll('.col-12.mb-4').forEach(section => {
+                const visibleCards = section.querySelectorAll('.col:not([style*="display: none"])');
+                if (visibleCards.length === 0) {
+                    section.style.display = 'none';
+                } else {
+                    section.style.display = '';
+                }
+            });
+        }
+        
+        function getCategoryGroup(categoryName) {
+            const categoryMap = {
+                'construction': ['masonry', 'carpentry', 'roofing', 'tiling', 'painting', 'drywall', 'steel fabrication', 'glass work'],
+                'electrical': ['electrical wiring', 'lighting', 'generator repair', 'solar installation', 'inverter systems', 'security systems', 'home automation'],
+                'plumbing': ['plumbing', 'pipe fitting', 'water heater', 'borehole', 'water treatment', 'septic tank', 'drainage'],
+                'hvac': ['ac installation', 'ac repair', 'ac maintenance', 'refrigeration', 'ventilation', 'cold room'],
+                'home': ['cleaning', 'pest control', 'laundry', 'gardening', 'home organizing', 'moving'],
+                'automotive': ['auto repair', 'auto electrician', 'panel beating', 'generator maintenance', 'elevator repair', 'industrial machines'],
+                'technology': ['computer repair', 'phone repair', 'network setup', 'smartphone repair', 'tv repair', 'sound systems'],
+                'furniture': ['furniture making', 'upholstery', 'curtains', 'interior design', 'cabinet making'],
+                'metal': ['welding', 'blacksmith', 'gate making', 'metal doors', 'iron bending'],
+                'beauty': ['hair styling', 'makeup artist', 'nail technician', 'spa services', 'tailoring'],
+                'event': ['catering', 'photography', 'event decoration', 'dj services', 'mc services'],
+                'professional': ['tutoring', 'graphic design', 'writing', 'web development', 'legal services', 'accounting'],
+                'health': ['fitness training', 'yoga instruction', 'nutritionist', 'home nursing', 'therapy'],
+                'logistics': ['delivery services', 'transportation', 'errand running', 'courier services'],
+                'other': ['laundry', 'child care', 'elderly care', 'pet care', 'other']
+            };
+            
+            for (const [group, categories] of Object.entries(categoryMap)) {
+                if (categories.some(cat => categoryName.includes(cat))) {
+                    return group;
+                }
+            }
+            return 'other';
+        }
+        
+        // Event listeners
+        if (searchBtn) searchBtn.addEventListener('click', filterServices);
+        if (searchInput) {
+            searchInput.addEventListener('keyup', function(e) {
+                if (e.key === 'Enter') filterServices();
+            });
+        }
+        if (categoryFilter) categoryFilter.addEventListener('change', filterServices);
+        
+        // Preselect category from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const categoryParam = urlParams.get('category');
+        if (categoryParam) {
+            // Find and highlight the specific category card
+            document.querySelectorAll('.service-card').forEach(card => {
+                const link = card.querySelector('a[href*="category="]');
+                if (link && link.href.includes(categoryParam)) {
+                    card.style.boxShadow = '0 0 0 3px rgba(13, 110, 253, 0.3)';
+                    card.style.borderColor = '#0d6efd';
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            });
+        }
+        
+        // Animation on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+        
+        // Observe service cards for animation
+        document.querySelectorAll('.service-card').forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            card.style.transition = 'all 0.5s ease';
+            observer.observe(card);
+        });
+    });
+</script>
+{% endblock %}
