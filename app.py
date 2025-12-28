@@ -295,10 +295,7 @@ def create_app(config_class):
     # Create database tables
     with app.app_context():
         db.create_all()
-
-        # Populate service categories if empty
-        if ServiceCategory.query.count() == 0:
-            populate_service_categories()
+        populate_service_categories()
         
         # Create default admin if not exists
         if not Admin.query.filter_by(email='admin@uwailaglobal.com').first():
