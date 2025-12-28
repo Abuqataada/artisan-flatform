@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, render_template
+from flask import Blueprint, request, jsonify, render_template, redirect, url_for
 from flask_login import login_required, current_user
 from functools import wraps
 from models import db, Admin, User, Artisan, ServiceRequest, ServiceCategory, Notification
@@ -447,3 +447,54 @@ def generate_service_report():
         return jsonify(report_data)
     else:
         return render_template('admin/reports.html', report_data=report_data)
+    
+# Add these routes to admin_routes.py after the existing routes
+
+# Reports route - FIXING THE MISSING ENDPOINT
+@admin_bp.route('/reports')
+@admin_required
+def admin_reports():
+    """Main reports page"""
+    if request.is_json:
+        return jsonify({'message': 'Reports endpoint'})
+    else:
+        return render_template('admin/reports.html')
+
+# Settings route - FIXING THE MISSING ENDPOINT
+@admin_bp.route('/settings')
+@admin_required
+def admin_settings():
+    """Admin settings page"""
+    if request.is_json:
+        return jsonify({'message': 'Settings endpoint'})
+    else:
+        return render_template('admin/settings.html')
+
+# Verify artisans route - FIXING THE MISSING ENDPOINT (redirects to pending verification)
+@admin_bp.route('/artisans/verify')
+@admin_required
+def verify_artisans():
+    """Redirect to pending verification page"""
+    return redirect(url_for('admin_bp.get_pending_verification'))
+
+# Create category route - FIXING THE MISSING ENDPOINT
+@admin_bp.route('/categories/create')
+@admin_required
+def create_category():
+    """Page to create new category"""
+    if request.is_json:
+        return jsonify({'message': 'Create category page'})
+    else:
+        return render_template('admin/create_category.html')
+
+# View artisan route - FIXING THE MISSING ENDPOINT
+@admin_bp.route('/artisans/view/<artisan_id>')
+@admin_required
+def view_artisan(artisan_id):
+    """View artisan details page"""
+    artisan = Artisan.query.get_or_404(artisan_id)
+    
+    if request.is_json:
+        return jsonify(artisan.to_dict())
+    else:
+        return render_template('admin/view_artisan.html', artisan=artisan)
