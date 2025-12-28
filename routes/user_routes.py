@@ -172,22 +172,20 @@ def dashboard():
                               unread_notifications=unread_notifications)
     
 @user_bp.route('/services')
+@login_required
 def services():
     """View all service categories"""
-    from models import ServiceCategory, Artisan, ServiceRequest
     
     categories = ServiceCategory.query.filter_by(is_active=True).order_by(ServiceCategory.name).all()
     
-    # Get popular categories (you can implement your own logic)
-    popular_categories = ServiceCategory.query.filter_by(is_active=True).limit(8).all()
-    
-    # Get stats for display
+    # Get stats
     active_artisans = Artisan.query.filter_by(is_active=True, is_verified=True).count()
     completed_jobs = ServiceRequest.query.filter_by(status='completed').count()
+    available_categories = ServiceCategory.query.filter_by(is_active=True).count()
     
     return render_template('user/services.html',
                          categories=categories,
-                         popular_categories=popular_categories,
+                         available_categories=available_categories,
                          active_artisans=active_artisans,
                          completed_jobs=completed_jobs)
 

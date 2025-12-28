@@ -151,7 +151,17 @@ def create_app(config_class):
             from models import Artisan
             return Artisan.query.filter_by(category=category_name, is_active=True, is_verified=True).count()
         
-        return dict(get_artisan_count=get_artisan_count)
+        def get_average_rating(category_name):
+            """Get average rating for a category"""
+            from models import Artisan
+            artisans = Artisan.query.filter_by(category=category_name, is_active=True, is_verified=True).all()
+            if not artisans:
+                return 4.5  # Default rating
+            total_rating = sum(artisan.rating or 0 for artisan in artisans)
+            avg = total_rating / len(artisans)
+            return round(avg, 1)
+        
+        return dict(get_artisan_count=get_artisan_count, get_average_rating=get_average_rating)
     
     # Add context processor for helper function
     @app.context_processor
