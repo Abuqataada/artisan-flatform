@@ -3,7 +3,7 @@ from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_cors import CORS
 from config import Config
-from models import db, User, Artisan, Admin, ServiceCategory
+from models import db, User, ServiceCategory, AdminProfile
 import os
 from datetime import datetime, timedelta, timezone
 from dateutil import tz
@@ -282,14 +282,6 @@ def create_app(config_class):
         user = User.query.get(user_id)
         if user:
             return user
-        
-        artisan = Artisan.query.get(user_id)
-        if artisan:
-            return artisan
-            
-        admin = Admin.query.get(user_id)
-        if admin:
-            return admin
             
         return None
     
@@ -311,17 +303,32 @@ def create_app(config_class):
             populate_service_categories()
         
         # Create default admin if not exists
-        if not Admin.query.filter_by(email='admin@uwailaglobal.com').first():
-            default_admin = Admin(
+        admin_user = User.query.filter_by(email='admin@uwailaglobal.com').first()
+        if not admin_user:
+            # Create admin user
+            admin_user = User(
                 email='admin@uwailaglobal.com',
-                username='admin',
-                full_name='System Administrator'
+                phone='08000000000',  # Add a default phone
+                full_name='System Administrator',
+                user_type='admin',
+                is_verified=True,
+                is_active=True
             )
-            default_admin.set_password('Admin123!')
-            db.session.add(default_admin)
+            admin_user.set_password('Admin123!')
+            db.session.add(admin_user)
+            db.session.flush()  # Get the user ID
+            
+            # Create admin profile
+            admin_profile = AdminProfile(
+                user_id=admin_user.id,
+                username='admin',
+                is_super_admin=True,
+                department='System Administration'
+            )
+            db.session.add(admin_profile)
             db.session.commit()
-    
-    return app
+        
+        return app
 
 load_dotenv()
 

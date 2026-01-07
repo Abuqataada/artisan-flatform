@@ -42,6 +42,16 @@
                     <a class="nav-link" href="{{ url_for('user_bp.create_service_request') }}">
                         <i class="fas fa-plus-circle me-2"></i>New Request
                     </a>
+                    {% if user.user_type == 'customer' %}
+                    <a class="nav-link" href="{{ url_for('user_bp.upgrade_to_artisan') }}">
+                        <i class="fas fa-plus-circle me-2"></i>Become an Artisan
+                    </a>
+                    {% endif %}
+                    {% if user.is_artisan %}
+                    <a class="nav-link" href="{{ url_for('artisan_bp.artisan_dashboard') }}">
+                        <i class="fas fa-plus-circle me-2"></i>Artisan Dashboard
+                    </a>
+                    {% endif %}
                     <a class="nav-link" href="{{ url_for('user_bp.my_requests') }}">
                         <i class="fas fa-list-alt me-2"></i>My Requests
                     </a>

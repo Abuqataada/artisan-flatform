@@ -2,7 +2,7 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, BooleanField, SubmitField
 from wtforms.validators import DataRequired, Email, Length, ValidationError
-from models import User, Artisan, Admin
+from models import User
 
 class LoginForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
@@ -13,8 +13,8 @@ class LoginForm(FlaskForm):
     def validate_email(self, email):
         # Check if user exists in any of the tables
         user = User.query.filter_by(email=email.data).first()
-        artisan = Artisan.query.filter_by(email=email.data).first()
-        admin = Admin.query.filter_by(email=email.data).first()
+        artisan = User.query.filter_by(email=email.data, user_type='artisan').first()
+        admin = User.query.filter_by(email=email.data, user_type='admin').first()
         
         if not user and not artisan and not admin:
             raise ValidationError('Email not registered.')
@@ -45,6 +45,6 @@ class ArtisanRegistrationForm(FlaskForm):
     submit = SubmitField('Submit for Verification')
     
     def validate_email(self, email):
-        artisan = Artisan.query.filter_by(email=email.data).first()
+        artisan = User.query.filter_by(email=email.data, user_type='artisan').first()
         if artisan:
             raise ValidationError('Email already registered.')

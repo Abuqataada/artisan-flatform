@@ -1,7 +1,11 @@
-from flask import Blueprint, request, jsonify, render_template, flash, redirect, url_for
+# user_routes.py
+
+from flask import Blueprint, request, jsonify, render_template, flash, redirect, url_for, current_app
+import os
+from werkzeug.utils import secure_filename
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash
-from models import db, User, ServiceRequest, ServiceCategory, Notification, Admin, Artisan
+from models import db, User, ServiceRequest, ServiceCategory, Notification, ArtisanProfile
 from datetime import datetime
 import json
 from forms import LoginForm, UserRegistrationForm
@@ -22,7 +26,7 @@ def get_user_stats(user_id):
         'completed_requests': completed_requests
     }
     
-# Authentication Routes
+# Authentication Routes - CUSTOMER REGISTRATION
 @user_bp.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -37,7 +41,8 @@ def register():
             email=data['email'],
             phone=data['phone'],
             full_name=data['full_name'],
-            address=data.get('address', '')
+            address=data.get('address', ''),
+            user_type='customer'  # CRITICAL: Set user_type
         )
         user.set_password(data['password'])
         
@@ -47,7 +52,6 @@ def register():
         # Create welcome notification
         notification = Notification(
             user_id=user.id,
-            user_type='user',
             title='Welcome to Uwaila Global!',
             message='Your account has been created successfully.',
             notification_type='welcome'
@@ -65,14 +69,14 @@ def register():
             return redirect(url_for('user_bp.login'))
     
     return render_template('auth/user_register.html')
-
+       
 @user_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
         # Redirect based on user type
-        if isinstance(current_user, Admin):
+        if current_user.user_type == 'admin':
             return redirect(url_for('admin_bp.admin_dashboard'))
-        elif isinstance(current_user, Artisan):
+        if current_user.user_type == 'artisan':
             return redirect(url_for('artisan_bp.artisan_dashboard'))
         else:
             return redirect(url_for('user_bp.dashboard'))
@@ -84,10 +88,10 @@ def login():
         user = User.query.filter_by(email=form.email.data).first()
         if not user:
             # Try artisan
-            user = Artisan.query.filter_by(email=form.email.data).first()
+            user = User.query.filter_by(email=form.email.data, user_type='artisan').first()
             if not user:
                 # Try admin
-                user = Admin.query.filter_by(email=form.email.data).first()
+                user = User.query.filter_by(email=form.email.data, user_type='admin').first()
         
         if user and user.check_password(form.password.data):
             if not getattr(user, 'is_active', True):
@@ -101,10 +105,10 @@ def login():
             if next_page:
                 return redirect(next_page)
             
-            if isinstance(user, Admin):
+            if user.user_type == 'admin':
                 flash('Welcome back, Admin!', 'success')
                 return redirect(url_for('admin_bp.admin_dashboard'))
-            elif isinstance(user, Artisan):
+            if user.user_type == 'artisan':
                 flash('Welcome back, Artisan!', 'success')
                 return redirect(url_for('artisan_bp.artisan_dashboard'))
             else:
@@ -125,6 +129,108 @@ def logout():
         flash('Logged out successfully', 'success')
         return redirect(url_for('user_bp.login'))
 
+@user_bp.route('/upgrade-to-artisan', methods=['GET', 'POST'])
+@login_required
+def upgrade_to_artisan():
+    """Allow existing customers to become artisans"""
+    # Get the logged-in user
+    user = current_user
+    
+    # Check if user is already an artisan
+    if user.is_artisan:
+        flash('You are already registered as an artisan!', 'info')
+        return redirect(url_for('artisan_bp.dashboard'))
+    
+    # Get all active service categories for the form
+    service_categories = ServiceCategory.query.filter_by(is_active=True).all()
+    
+    if request.method == 'GET':
+        return render_template('auth/upgrade_to_artisan.html', 
+                              categories=service_categories,
+                              user=user)
+    
+    elif request.method == 'POST':
+        data = request.form if request.form else request.get_json()
+        
+        try:
+            # 1. Update user type to artisan
+            user.user_type = 'artisan'
+            user.is_verified = False  # Require verification again
+            
+            # 2. Create ArtisanProfile
+            artisan_profile = ArtisanProfile(
+                user_id=user.id,
+                category=data['category'],
+                skills=data.get('skills', ''),
+                experience_years=int(data.get('experience_years', 0)),
+                availability='available'
+            )
+            
+            # Handle credentials
+            if data.get('credentials'):
+                credentials_list = [c.strip() for c in data['credentials'].split(',') if c.strip()]
+                artisan_profile.credentials = json.dumps(credentials_list)
+            
+            # Handle portfolio images
+            portfolio_images = []
+            if 'portfolio_images' in request.files:
+                uploaded_files = request.files.getlist('portfolio_images')
+                for file in uploaded_files:
+                    if file and file.filename:
+                        filename = secure_filename(file.filename)
+                        file_path = os.path.join(
+                            current_app.config['UPLOAD_FOLDER'], 
+                            'portfolio', 
+                            filename
+                        )
+                        file.save(file_path)
+                        portfolio_images.append(f'portfolio/{filename}')
+            
+            if portfolio_images:
+                artisan_profile.portfolio_images = json.dumps(portfolio_images)
+            
+            db.session.add(artisan_profile)
+            
+            # 3. Create notification for admin
+            notification = Notification(
+                user_id='admin',  # Replace with actual admin ID
+                title='Customer Upgraded to Artisan',
+                message=f'{user.full_name} ({user.email}) has upgraded to artisan in {artisan_profile.category}',
+                notification_type='artisan_upgrade',
+                related_id=user.id
+            )
+            db.session.add(notification)
+            
+            # 4. Create notification for user
+            user_notification = Notification(
+                user_id=user.id,
+                title='Artisan Registration Submitted',
+                message='Your artisan registration is pending admin verification.',
+                notification_type='upgrade_pending'
+            )
+            db.session.add(user_notification)
+            
+            db.session.commit()
+            
+            if request.is_json:
+                return jsonify({
+                    'message': 'Artisan registration submitted for verification',
+                    'user': user.to_dict()
+                }), 200
+            else:
+                flash('Artisan registration submitted for verification!', 'success')
+                return redirect(url_for('user_bp.dashboard'))
+                
+        except Exception as e:
+            db.session.rollback()
+            if request.is_json:
+                return jsonify({'error': str(e)}), 500
+            else:
+                flash(f'Error: {str(e)}', 'danger')
+                return render_template('auth/upgrade_to_artisan.html',
+                                      categories=service_categories,
+                                      user=user)
+            
 # Service Request Routes
 @user_bp.route('/dashboard')
 @login_required
@@ -134,9 +240,9 @@ def dashboard():
             return jsonify({'error': 'User access required'}), 403
         else:
             flash('User access required', 'danger')
-            if isinstance(current_user, Admin):
+            if current_user.user_type == 'admin':
                 return redirect(url_for('admin_bp.admin_dashboard'))
-            elif isinstance(current_user, Artisan):
+            if current_user.user_type == 'artisan':
                 return redirect(url_for('artisan_bp.artisan_dashboard'))
             return redirect(url_for('main_bp.home'))  # Add a home route or login
     
@@ -153,9 +259,8 @@ def dashboard():
     
     # Get unread notifications count
     unread_notifications = Notification.query.filter_by(
-        user_id=current_user.id,
-        user_type='user',
-        is_read=False
+    user_id=current_user.id,
+    is_read=False
     ).count()
     
     if request.is_json:
@@ -165,11 +270,12 @@ def dashboard():
             'recent_requests': [req.to_dict() for req in recent_requests]
         })
     else:
-        return render_template('user/dashboard.html', 
-                              stats=stats,
-                              recent_requests=recent_requests,
-                              categories=categories,
-                              unread_notifications=unread_notifications)
+        return render_template('user/dashboard.html',
+                               stats=stats,
+                               recent_requests=recent_requests,
+                               categories=categories,
+                               user=current_user,
+                               unread_notifications=unread_notifications)
     
 @user_bp.route('/services')
 @login_required
@@ -179,7 +285,7 @@ def services():
     categories = ServiceCategory.query.filter_by(is_active=True).order_by(ServiceCategory.name).all()
     
     # Get stats
-    active_artisans = Artisan.query.filter_by(is_active=True, is_verified=True).count()
+    active_artisans = User.query.filter_by(user_type='artisan', is_active=True, is_verified=True).count()
     completed_jobs = ServiceRequest.query.filter_by(status='completed').count()
     available_categories = ServiceCategory.query.filter_by(is_active=True).count()
     
@@ -197,7 +303,7 @@ def view_request(request_id):
     service_request = ServiceRequest.query.get_or_404(request_id)
     
     # Ensure user owns this request
-    if service_request.user_id != current_user.id and not isinstance(current_user, Admin):
+    if service_request.user_id != current_user.id and current_user.user_type != 'admin':
         flash('Unauthorized access', 'danger')
         return redirect(url_for('user_bp.my_requests'))
     
@@ -304,7 +410,7 @@ def get_service_request(request_id):
     service_request = ServiceRequest.query.get_or_404(request_id)
     
     # Ensure user owns this request
-    if service_request.user_id != current_user.id and not isinstance(current_user, Admin):
+    if service_request.user_id != current_user.id and current_user.user_type != 'admin':
         if request.is_json:
             return jsonify({'error': 'Unauthorized'}), 403
         else:
@@ -390,12 +496,13 @@ def get_notifications():
     
     # Get all notifications
     notifications = Notification.query.filter_by(
-        user_id=current_user.id,
-        user_type='user'
+        user_id=current_user.id
     ).order_by(Notification.created_at.desc()).all()
-    
-    # Calculate stats
-    unread_count = sum(1 for n in notifications if not n.is_read)
+
+    unread_count = Notification.query.filter_by(
+        user_id=current_user.id,
+        is_read=False
+    ).count()
     
     # This week count
     from datetime import datetime, timedelta
@@ -441,7 +548,6 @@ def mark_all_notifications_read():
     """Mark all notifications as read"""
     notifications = Notification.query.filter_by(
         user_id=current_user.id,
-        user_type='user',
         is_read=False
     ).all()
     

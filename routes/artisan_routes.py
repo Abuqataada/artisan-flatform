@@ -1,8 +1,7 @@
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from functools import wraps
-from models import db, Artisan, ServiceRequest, ServiceCategory, Notification
-from datetime import datetime, timedelta
+from models import db, User, ServiceRequest, ServiceCategory, Notification, ArtisanProfile, Withdrawal, PaymentTransaction, Review
 import json
 import os
 from werkzeug.utils import secure_filename
@@ -14,6 +13,8 @@ from extension import app
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
+
+from datetime import datetime, timedelta, timezone
 
 
 artisan_bp = Blueprint('artisan_bp', __name__)
@@ -133,7 +134,7 @@ def artisan_required(f):
     @wraps(f)
     @login_required
     def decorated(*args, **kwargs):
-        if not isinstance(current_user, Artisan):
+        if current_user.user_type != 'artisan':
             if request.is_json:
                 return jsonify({'error': 'Artisan access required'}), 403
             else:
@@ -141,62 +142,91 @@ def artisan_required(f):
         return f(*args, **kwargs)
     return decorated
 
-# Registration and Profile
+# ARTISAN REGISTRATION
 @artisan_bp.route('/register', methods=['GET', 'POST'])
 def register():
-    if request.method == 'GET':
-        return render_template('auth/artisan_register.html')
+    # Get all active service categories for the form
+    service_categories = ServiceCategory.query.filter_by(is_active=True).all()
     
+    if request.method == 'GET':
+        return render_template('auth/artisan_register.html', 
+                              categories=service_categories)
+
     elif request.method == 'POST':
         data = request.form if request.form else request.get_json()
         
-        # Check if artisan already exists
-        if Artisan.query.filter_by(email=data.get('email')).first():
+        # Check if user already exists
+        if User.query.filter_by(email=data.get('email')).first():
             if request.is_json:
                 return jsonify({'error': 'Email already registered'}), 400
             else:
                 return render_template('auth/artisan_register.html', 
+                                      categories=service_categories,
                                       error='Email already registered')
         
-        # Create new artisan
-        artisan = Artisan(
+        # 1. Create new User (base user)
+        user = User(
             email=data['email'],
             phone=data['phone'],
             full_name=data['full_name'],
-            category=data['category'],
-            skills=data.get('skills', ''),
-            experience_years=data.get('experience_years', 0),
-            availability='available',
+            address=data.get('address', ''),
+            user_type='artisan',  # CRITICAL: Set user_type
             is_verified=False  # Requires admin verification
         )
-        artisan.set_password(data['password'])
+        user.set_password(data['password'])
+        
+        db.session.add(user)
+        db.session.flush()  # Get user ID without committing
+        
+        # 2. Create ArtisanProfile with artisan-specific fields
+        artisan_profile = ArtisanProfile(
+            user_id=user.id,
+            category=data['category'],
+            skills=data.get('skills', ''),
+            experience_years=int(data.get('experience_years', 0)),
+            availability='available'
+        )
         
         # Handle credentials (JSON array)
-        if 'credentials' in data:
-            artisan.credentials = json.dumps(data['credentials'])
+        if data.get('credentials'):
+            credentials_list = [c.strip() for c in data['credentials'].split(',') if c.strip()]
+            artisan_profile.credentials = json.dumps(credentials_list)
         
         # Handle portfolio images
-        if 'portfolio_images' in data:
-            artisan.portfolio_images = json.dumps(data['portfolio_images'])
+        portfolio_images = []
+        if 'portfolio_images' in request.files:
+            uploaded_files = request.files.getlist('portfolio_images')
+            for file in uploaded_files:
+                if file and file.filename:
+                    # Save file logic here
+                    filename = secure_filename(file.filename)
+                    # Save to upload folder
+                    file_path = os.path.join(
+                        current_app.config['UPLOAD_FOLDER'], 
+                        'portfolio', 
+                        filename
+                    )
+                    file.save(file_path)
+                    portfolio_images.append(f'portfolio/{filename}')
         
-        db.session.add(artisan)
-        db.session.commit()
+        if portfolio_images:
+            artisan_profile.portfolio_images = json.dumps(portfolio_images)
+        
+        db.session.add(artisan_profile)
         
         # Create notification for admin
         notification = Notification(
-            user_id='admin',
-            user_type='admin',
+            user_id='admin',  # You need to get actual admin user ID
             title='New Artisan Registration',
-            message=f'New artisan registered: {artisan.full_name} ({artisan.category})',
+            message=f'New artisan registered: {user.full_name} ({artisan_profile.category})',
             notification_type='new_artisan',
-            related_id=artisan.id
+            related_id=user.id
         )
         db.session.add(notification)
         
         # Create welcome notification for artisan
         artisan_notification = Notification(
-            user_id=artisan.id,
-            user_type='artisan',
+            user_id=user.id,
             title='Registration Successful',
             message='Your registration is pending admin verification.',
             notification_type='registration_pending'
@@ -208,12 +238,12 @@ def register():
         if request.is_json:
             return jsonify({
                 'message': 'Registration submitted for verification',
-                'artisan': artisan.to_dict()
+                'user': user.to_dict()
             }), 201
         else:
             return render_template('auth/registration_success.html',
                                   message='Registration submitted for verification')
-
+ 
 @artisan_bp.route('/dashboard')
 @artisan_required
 def artisan_dashboard():
@@ -255,15 +285,13 @@ def artisan_dashboard():
     
     # Notifications
     notifications = Notification.query.filter_by(
-        user_id=current_user.id,
-        user_type='artisan'
+        user_id=current_user.id
     ).order_by(Notification.created_at.desc())\
      .limit(5)\
      .all()
     
     unread_count = Notification.query.filter_by(
         user_id=current_user.id,
-        user_type='artisan',
         is_read=False
     ).count()
     
@@ -292,20 +320,66 @@ def artisan_dashboard():
                               notifications=notifications,
                               unread_notifications=unread_count)
 
+# Add these helper functions if not already defined
+def calculate_response_rate(artisan_id):
+    """Calculate artisan's response rate to job requests"""
+    # Get all jobs assigned to artisan in last 30 days
+    recent_jobs = ServiceRequest.query.filter(
+        ServiceRequest.artisan_id == artisan_id,
+        ServiceRequest.created_at >= datetime.now(timezone.utc) - timedelta(days=30)
+    ).all()
+    
+    if not recent_jobs:
+        return 0
+    
+    # Count jobs where artisan responded within 24 hours
+    responded_jobs = 0
+    for job in recent_jobs:
+        # Check if there's a response record or status change within 24 hours
+        # This is simplified - you might have a better metric
+        if job.updated_at and job.created_at:
+            response_time = job.updated_at - job.created_at
+            if response_time <= timedelta(hours=24):
+                responded_jobs += 1
+    
+    return round((responded_jobs / len(recent_jobs)) * 100, 1)
+
+def calculate_completion_rate(artisan_id):
+    """Calculate artisan's job completion rate"""
+    total_assigned = ServiceRequest.query.filter_by(
+        artisan_id=artisan_id
+    ).count()
+    
+    total_completed = ServiceRequest.query.filter_by(
+        artisan_id=artisan_id,
+        status='completed'
+    ).count()
+    
+    if total_assigned == 0:
+        return 0
+    
+    return round((total_completed / total_assigned) * 100, 1)
+
 @artisan_bp.route('/profile', methods=['GET', 'PUT', 'POST'])
 @artisan_required
 def artisan_profile():
     if request.method == 'GET':
+        # Get artisan profile data
+        artisan_profile = current_user.artisan_profile
+        
+        if not artisan_profile:
+            return jsonify({'error': 'Artisan profile not found'}), 404
+        
         # Calculate profile completion percentage
         profile_fields = [
             ('full_name', current_user.full_name),
             ('email', current_user.email),
             ('phone', current_user.phone),
-            ('category', current_user.category),
-            ('skills', current_user.skills),
-            ('experience_years', current_user.experience_years),
-            ('portfolio_images', current_user.portfolio_images),
-            ('credentials', current_user.credentials),
+            ('category', artisan_profile.category),
+            ('skills', artisan_profile.skills),
+            ('experience_years', artisan_profile.experience_years),
+            ('portfolio_images', artisan_profile.portfolio_images),
+            ('credentials', artisan_profile.credentials),
         ]
         
         completed_fields = sum(1 for field, value in profile_fields if value)
@@ -313,7 +387,6 @@ def artisan_profile():
         profile_completion = int((completed_fields / total_fields) * 100)
         
         # Get categories for dropdown
-        from models import ServiceCategory
         categories = ServiceCategory.query.filter_by(is_active=True).all()
         
         # Get statistics for profile page
@@ -322,11 +395,13 @@ def artisan_profile():
                 artisan_id=current_user.id,
                 status='completed'
             ).count(),
-            'total_earnings': db.session.query(db.func.sum(ServiceRequest.actual_price))
-                .filter(ServiceRequest.artisan_id == current_user.id,
-                        ServiceRequest.status == 'completed',
-                        ServiceRequest.actual_price.isnot(None))
-                .scalar() or 0,
+            'total_earnings': float(db.session.query(
+                db.func.coalesce(db.func.sum(ServiceRequest.actual_price), 0)
+            ).filter(
+                ServiceRequest.artisan_id == current_user.id,
+                ServiceRequest.status == 'completed',
+                ServiceRequest.actual_price.isnot(None)
+            ).scalar()),
             'active_jobs': ServiceRequest.query.filter_by(
                 artisan_id=current_user.id,
                 status='in_progress'
@@ -335,15 +410,27 @@ def artisan_profile():
                 artisan_id=current_user.id,
                 status='assigned'
             ).count(),
-            'average_rating': current_user.rating or 0,
+            'average_rating': float(artisan_profile.rating) if artisan_profile.rating else 0.0,
             'response_rate': calculate_response_rate(current_user.id),
             'completion_rate': calculate_completion_rate(current_user.id),
         }
         
         if request.is_json:
             artisan_data = current_user.to_dict()
-            artisan_data['credentials'] = json.loads(current_user.credentials) if current_user.credentials else []
-            artisan_data['portfolio_images'] = json.loads(current_user.portfolio_images) if current_user.portfolio_images else []
+            # Add artisan profile specific data
+            artisan_data.update({
+                'category': artisan_profile.category,
+                'skills': artisan_profile.skills,
+                'experience_years': artisan_profile.experience_years,
+                'availability': artisan_profile.availability,
+                'hourly_rate': artisan_profile.hourly_rate,
+                'min_service_fee': artisan_profile.min_service_fee,
+                'credentials': json.loads(artisan_profile.credentials) if artisan_profile.credentials else [],
+                'portfolio_images': json.loads(artisan_profile.portfolio_images) if artisan_profile.portfolio_images else [],
+                'rating': artisan_profile.rating,
+                'total_jobs': artisan_profile.total_jobs,
+                'completed_jobs': artisan_profile.completed_jobs,
+            })
             return jsonify({
                 'artisan': artisan_data,
                 'profile_completion': profile_completion,
@@ -351,79 +438,170 @@ def artisan_profile():
                 'categories': [cat.to_dict() for cat in categories]
             })
         else:
+            # Parse portfolio images and credentials for template
+            portfolio_images = json.loads(artisan_profile.portfolio_images) if artisan_profile.portfolio_images else []
+            credentials = json.loads(artisan_profile.credentials) if artisan_profile.credentials else []
+            
             return render_template('artisan/profile.html',
                                   artisan=current_user,
+                                  artisan_profile=artisan_profile,
                                   profile_completion=profile_completion,
                                   stats=stats,
-                                  categories=categories)
+                                  categories=categories,
+                                  portfolio_images=portfolio_images,
+                                  credentials=credentials)
     
     elif request.method == 'PUT':
+        if not current_user.artisan_profile:
+            return jsonify({'error': 'Artisan profile not found'}), 404
+        
         data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
         
-        # Update editable fields with validation
-        editable_fields = ['phone', 'full_name', 'category', 'skills', 
-                          'experience_years', 'availability']
+        artisan_profile = current_user.artisan_profile
         
-        for field in editable_fields:
-            if field in data:
-                # Add validation based on field type
-                if field == 'phone':
-                    # Validate phone number
-                    if not re.match(r'^\+?[\d\s\-\(\)]{10,}$', str(data[field])):
-                        return jsonify({'error': 'Invalid phone number format'}), 400
-                elif field == 'email':
-                    # Check if email is already taken by another user
-                    existing = Artisan.query.filter(
-                        Artisan.email == data[field],
-                        Artisan.id != current_user.id
+        try:
+            # Update user fields
+            if 'full_name' in data:
+                if not data['full_name'].strip():
+                    return jsonify({'error': 'Full name cannot be empty'}), 400
+                current_user.full_name = data['full_name'].strip()
+            
+            if 'phone' in data:
+                if not re.match(r'^\+?[\d\s\-\(\)]{10,}$', str(data['phone'])):
+                    return jsonify({'error': 'Invalid phone number format'}), 400
+                current_user.phone = data['phone']
+            
+            if 'email' in data:
+                if data['email'] != current_user.email:
+                    existing = User.query.filter(
+                        User.email == data['email'],
+                        User.id != current_user.id
                     ).first()
                     if existing:
                         return jsonify({'error': 'Email already registered'}), 400
-                elif field == 'experience_years':
-                    # Ensure it's a positive number
-                    try:
-                        years = int(data[field])
-                        if years < 0 or years > 50:
-                            return jsonify({'error': 'Experience years must be between 0 and 50'}), 400
-                    except ValueError:
-                        return jsonify({'error': 'Invalid experience years'}), 400
-                
-                setattr(current_user, field, data[field])
-        
-        # Handle credentials update
-        if 'credentials' in data:
-            if isinstance(data['credentials'], list):
-                current_user.credentials = json.dumps(data['credentials'])
-            else:
-                current_user.credentials = data['credentials']
-        
-        # Handle portfolio images update
-        if 'portfolio_images' in data:
-            if isinstance(data['portfolio_images'], list):
-                # Limit to 20 images
-                images = data['portfolio_images'][:20]
-                current_user.portfolio_images = json.dumps(images)
-            else:
-                current_user.portfolio_images = data['portfolio_images']
-        
-        # Update timestamp
-        current_user.updated_at = datetime.utcnow()
-        
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'Profile updated successfully',
-            'artisan': current_user.to_dict()
-        })
+                    current_user.email = data['email']
+            
+            # Update artisan profile fields
+            if 'category' in data:
+                # Verify category exists and is active
+                category = ServiceCategory.query.filter_by(
+                    name=data['category'],
+                    is_active=True
+                ).first()
+                if not category:
+                    return jsonify({'error': 'Invalid service category'}), 400
+                artisan_profile.category = data['category']
+            
+            if 'skills' in data:
+                artisan_profile.skills = data['skills']
+            
+            if 'experience_years' in data:
+                try:
+                    years = int(data['experience_years'])
+                    if years < 0 or years > 50:
+                        return jsonify({'error': 'Experience years must be between 0 and 50'}), 400
+                    artisan_profile.experience_years = years
+                except (ValueError, TypeError):
+                    return jsonify({'error': 'Invalid experience years'}), 400
+            
+            if 'availability' in data:
+                valid_availabilities = ['available', 'busy', 'offline']
+                if data['availability'] not in valid_availabilities:
+                    return jsonify({'error': 'Invalid availability status'}), 400
+                artisan_profile.availability = data['availability']
+            
+            if 'hourly_rate' in data:
+                try:
+                    rate = float(data['hourly_rate'])
+                    if rate < 0:
+                        return jsonify({'error': 'Hourly rate cannot be negative'}), 400
+                    artisan_profile.hourly_rate = rate
+                except (ValueError, TypeError):
+                    return jsonify({'error': 'Invalid hourly rate'}), 400
+            
+            if 'min_service_fee' in data:
+                try:
+                    fee = float(data['min_service_fee'])
+                    if fee < 0:
+                        return jsonify({'error': 'Minimum service fee cannot be negative'}), 400
+                    artisan_profile.min_service_fee = fee
+                except (ValueError, TypeError):
+                    return jsonify({'error': 'Invalid minimum service fee'}), 400
+            
+            # Handle credentials update
+            if 'credentials' in data:
+                if isinstance(data['credentials'], list):
+                    # Validate each credential is a string
+                    valid_credentials = []
+                    for cred in data['credentials']:
+                        if isinstance(cred, str) and cred.strip():
+                            valid_credentials.append(cred.strip())
+                    artisan_profile.credentials = json.dumps(valid_credentials)
+                elif isinstance(data['credentials'], str):
+                    # Handle comma-separated string
+                    creds = [c.strip() for c in data['credentials'].split(',') if c.strip()]
+                    artisan_profile.credentials = json.dumps(creds)
+                else:
+                    return jsonify({'error': 'Invalid credentials format'}), 400
+            
+            # Handle portfolio images update (URLs only in JSON)
+            if 'portfolio_images' in data:
+                if isinstance(data['portfolio_images'], list):
+                    # Limit to 20 images and validate each is a string
+                    valid_images = []
+                    for img in data['portfolio_images'][:20]:
+                        if isinstance(img, str) and img.strip():
+                            valid_images.append(img.strip())
+                    artisan_profile.portfolio_images = json.dumps(valid_images)
+                else:
+                    return jsonify({'error': 'Invalid portfolio images format'}), 400
+            
+            # Update timestamps
+            current_user.updated_at = datetime.now(timezone.utc)
+            
+            db.session.commit()
+            
+            # Return updated data
+            artisan_data = current_user.to_dict()
+            artisan_data.update({
+                'category': artisan_profile.category,
+                'skills': artisan_profile.skills,
+                'experience_years': artisan_profile.experience_years,
+                'availability': artisan_profile.availability,
+                'hourly_rate': artisan_profile.hourly_rate,
+                'min_service_fee': artisan_profile.min_service_fee,
+                'credentials': json.loads(artisan_profile.credentials) if artisan_profile.credentials else [],
+                'portfolio_images': json.loads(artisan_profile.portfolio_images) if artisan_profile.portfolio_images else [],
+            })
+            
+            return jsonify({
+                'message': 'Profile updated successfully',
+                'artisan': artisan_data
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Update failed: {str(e)}'}), 500
     
     elif request.method == 'POST':
         # Handle specific POST actions like changing password, deactivating account, etc.
-        action = request.args.get('action')
+        action = request.args.get('action') or (request.get_json() or {}).get('action')
+        
+        if not action:
+            return jsonify({'error': 'No action specified'}), 400
         
         if action == 'change-password':
             data = request.get_json()
+            if not data:
+                return jsonify({'error': 'No data provided'}), 400
+            
             current_password = data.get('current_password')
             new_password = data.get('new_password')
+            
+            if not current_password or not new_password:
+                return jsonify({'error': 'Both current and new password are required'}), 400
             
             if not current_user.check_password(current_password):
                 return jsonify({'error': 'Current password is incorrect'}), 400
@@ -432,25 +610,35 @@ def artisan_profile():
                 return jsonify({'error': 'New password must be at least 8 characters long'}), 400
             
             current_user.set_password(new_password)
+            current_user.updated_at = datetime.now(timezone.utc)
             db.session.commit()
             
             return jsonify({'message': 'Password changed successfully'})
         
         elif action == 'deactivate':
-            data = request.get_json()
+            data = request.get_json() or {}
             reason = data.get('reason', '')
             
             # Create deactivation record
-            from ..models import AccountDeactivation
             deactivation = AccountDeactivation(
                 user_id=current_user.id,
-                user_type='artisan',
-                reason=reason
+                reason=reason,
+                is_permanent=False
             )
             db.session.add(deactivation)
             
             # Deactivate account
             current_user.is_active = False
+            db.session.commit()
+            
+            # Create notification
+            notification = Notification(
+                user_id=current_user.id,
+                title='Account Deactivated',
+                message='Your artisan account has been deactivated.',
+                notification_type='account_deactivated'
+            )
+            db.session.add(notification)
             db.session.commit()
             
             return jsonify({'message': 'Account deactivated successfully'})
@@ -461,50 +649,96 @@ def artisan_profile():
                 return jsonify({'error': 'Account is already verified'}), 400
             
             # Check if verification was recently requested
-            from ..models import VerificationRequest
             recent_request = VerificationRequest.query.filter_by(
                 user_id=current_user.id,
-                user_type='artisan',
                 status='pending'
             ).filter(
-                VerificationRequest.created_at >= datetime.utcnow() - timedelta(days=7)
+                VerificationRequest.created_at >= datetime.now(timezone.utc) - timedelta(days=7)
             ).first()
             
             if recent_request:
                 return jsonify({'error': 'Verification request already pending. Please wait 7 days.'}), 400
             
-            # Create verification request
+            # Create verification request with artisan data
+            verification_data = {
+                'full_name': current_user.full_name,
+                'category': current_user.artisan_profile.category if current_user.artisan_profile else 'Unknown',
+                'experience_years': current_user.artisan_profile.experience_years if current_user.artisan_profile else 0,
+                'skills': current_user.artisan_profile.skills if current_user.artisan_profile else '',
+                'credentials': json.loads(current_user.artisan_profile.credentials) if current_user.artisan_profile and current_user.artisan_profile.credentials else [],
+                'portfolio_images': json.loads(current_user.artisan_profile.portfolio_images) if current_user.artisan_profile and current_user.artisan_profile.portfolio_images else []
+            }
+            
             verification_request = VerificationRequest(
                 user_id=current_user.id,
-                user_type='artisan',
                 status='pending',
-                request_data=json.dumps({
-                    'full_name': current_user.full_name,
-                    'category': current_user.category,
-                    'experience_years': current_user.experience_years,
-                    'skills': current_user.skills,
-                    'credentials': current_user.credentials
-                })
+                request_data=json.dumps(verification_data)
             )
             db.session.add(verification_request)
             
-            # Create notification for admin
-            notification = Notification(
-                user_id='admin',
-                user_type='admin',
-                title='Verification Request',
-                message=f'Artisan {current_user.full_name} has requested account verification',
-                notification_type='verification_request',
-                related_id=current_user.id
-            )
-            db.session.add(notification)
+            # Create notification for admin (you need to get actual admin ID)
+            # For now, find the first admin user
+            admin = User.query.filter_by(user_type='admin', is_active=True).first()
+            if admin:
+                notification = Notification(
+                    user_id=admin.id,
+                    title='Artisan Verification Request',
+                    message=f'Artisan {current_user.full_name} has requested account verification',
+                    notification_type='verification_request',
+                    related_id=current_user.id
+                )
+                db.session.add(notification)
             
             db.session.commit()
             
             return jsonify({'message': 'Verification request submitted successfully'})
         
+        elif action == 'upload-portfolio-image':
+            # Handle file upload for portfolio images
+            if 'portfolio_image' not in request.files:
+                return jsonify({'error': 'No file uploaded'}), 400
+            
+            file = request.files['portfolio_image']
+            if file.filename == '':
+                return jsonify({'error': 'No file selected'}), 400
+            
+            # Validate file type
+            allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+            if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
+                return jsonify({'error': 'Invalid file type. Allowed: PNG, JPG, JPEG, GIF, WEBP'}), 400
+            
+            # Save file
+            filename = secure_filename(file.filename)
+            file_path = os.path.join(
+                current_app.config['UPLOAD_FOLDER'],
+                'portfolio',
+                filename
+            )
+            
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            file.save(file_path)
+            
+            # Update portfolio images
+            portfolio_images = []
+            if current_user.artisan_profile and current_user.artisan_profile.portfolio_images:
+                portfolio_images = json.loads(current_user.artisan_profile.portfolio_images)
+            
+            # Add new image (limit to 20)
+            portfolio_images.insert(0, f'portfolio/{filename}')
+            portfolio_images = portfolio_images[:20]
+            
+            current_user.artisan_profile.portfolio_images = json.dumps(portfolio_images)
+            current_user.updated_at = datetime.now(timezone.utc)
+            db.session.commit()
+            
+            return jsonify({
+                'message': 'Image uploaded successfully',
+                'image_url': f'portfolio/{filename}',
+                'portfolio_images': portfolio_images
+            })
+        
         return jsonify({'error': 'Invalid action'}), 400
-
 
 # Helper functions for profile statistics
 def calculate_response_rate(artisan_id):
@@ -896,7 +1130,6 @@ def accept_job(job_id):
     # Create notification for admin
     notification = Notification(
         user_id='admin',
-        user_type='admin',
         title='Job Accepted by Artisan',
         message=f'Artisan {current_user.full_name} has accepted job: {job.title}',
         notification_type='job_accepted',
@@ -927,7 +1160,6 @@ def complete_job(job_id):
     # Create notification for admin
     admin_notification = Notification(
         user_id='admin',
-        user_type='admin',
         title='Job Completed',
         message=f'Job {job.title} has been completed by {current_user.full_name}',
         notification_type='job_completed',
@@ -937,7 +1169,6 @@ def complete_job(job_id):
     # Create notification for user
     user_notification = Notification(
         user_id=job.user_id,
-        user_type='user',
         title='Service Completed',
         message=f'Your service request has been completed by {current_user.full_name}',
         notification_type='service_completed',
@@ -973,7 +1204,6 @@ def report_job_issue(job_id):
     # Create notification for admin
     notification = Notification(
         user_id='admin',
-        user_type='admin',
         title='Issue Reported on Job',
         message=f'Artisan {current_user.full_name} reported an issue on job: {job.title}',
         notification_type='job_issue',
@@ -1022,6 +1252,8 @@ def earnings():
     if start_date:
         try:
             start = datetime.strptime(start_date, '%Y-%m-%d')
+            # Convert to UTC if your database stores UTC
+            start = start.replace(tzinfo=timezone.utc)
             query = query.filter(ServiceRequest.created_at >= start)
         except ValueError:
             pass
@@ -1029,63 +1261,82 @@ def earnings():
     if end_date:
         try:
             end = datetime.strptime(end_date, '%Y-%m-%d')
+            # Convert to UTC and set to end of day
+            end = end.replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
             query = query.filter(ServiceRequest.created_at <= end)
         except ValueError:
             pass
     
-    # Get statistics
+    # Get statistics - FIXED: Use proper aggregation
     total_completed_jobs = query.count()
-    total_earnings = db.session.query(db.func.sum(ServiceRequest.actual_price))\
+    
+    # Total earnings from completed jobs
+    total_earnings_result = db.session.query(db.func.coalesce(db.func.sum(ServiceRequest.actual_price), 0))\
         .filter(ServiceRequest.artisan_id == current_user.id,
                 ServiceRequest.status == 'completed',
                 ServiceRequest.actual_price.isnot(None))\
-        .scalar() or 0
+        .scalar()
+    total_earnings = float(total_earnings_result) if total_earnings_result else 0.0
     
     # This month's earnings
-    today = datetime.now()
+    today = datetime.now(timezone.utc)
     first_day_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    monthly_earnings = db.session.query(db.func.sum(ServiceRequest.actual_price))\
+    monthly_earnings_result = db.session.query(db.func.coalesce(db.func.sum(ServiceRequest.actual_price), 0))\
         .filter(ServiceRequest.artisan_id == current_user.id,
                 ServiceRequest.status == 'completed',
                 ServiceRequest.actual_price.isnot(None),
                 ServiceRequest.created_at >= first_day_of_month)\
-        .scalar() or 0
+        .scalar()
+    monthly_earnings = float(monthly_earnings_result) if monthly_earnings_result else 0.0
     
-    # Last month's earnings
-    last_month = today.replace(day=1) - timedelta(days=1)
-    first_day_last_month = last_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    last_month_earnings = db.session.query(db.func.sum(ServiceRequest.actual_price))\
+    # Last month's earnings - FIXED: Proper date calculation
+    first_day_this_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    last_day_last_month = first_day_this_month - timedelta(days=1)
+    first_day_last_month = last_day_last_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    last_month_earnings_result = db.session.query(db.func.coalesce(db.func.sum(ServiceRequest.actual_price), 0))\
         .filter(ServiceRequest.artisan_id == current_user.id,
                 ServiceRequest.status == 'completed',
                 ServiceRequest.actual_price.isnot(None),
                 ServiceRequest.created_at >= first_day_last_month,
-                ServiceRequest.created_at <= last_month)\
-        .scalar() or 0
+                ServiceRequest.created_at <= last_day_last_month)\
+        .scalar()
+    last_month_earnings = float(last_month_earnings_result) if last_month_earnings_result else 0.0
     
     # Get paginated jobs
     paginated_jobs = query.order_by(ServiceRequest.created_at.desc())\
         .paginate(page=page, per_page=per_page, error_out=False)
     
-    # Generate earnings data for chart (last 6 months)
+    # Generate earnings data for chart (last 6 months) - FIXED
     earnings_values = []
     labels = []
     for i in range(5, -1, -1):
-        month_start = (today.replace(day=1) - timedelta(days=30*i))
-        month_end = (month_start.replace(day=1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+        # Calculate month start and end properly
+        month_start = (first_day_this_month - timedelta(days=30*i))
+        # Find last day of the month
+        if month_start.month == 12:
+            month_end = month_start.replace(year=month_start.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            month_end = month_start.replace(month=month_start.month + 1, day=1) - timedelta(days=1)
         
-        month_earnings = db.session.query(db.func.sum(ServiceRequest.actual_price))\
+        # Set time to end of day
+        month_end = month_end.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        month_earnings_result = db.session.query(db.func.coalesce(db.func.sum(ServiceRequest.actual_price), 0))\
             .filter(ServiceRequest.artisan_id == current_user.id,
                     ServiceRequest.status == 'completed',
                     ServiceRequest.actual_price.isnot(None),
                     ServiceRequest.created_at >= month_start,
                     ServiceRequest.created_at <= month_end)\
-            .scalar() or 0
+            .scalar()
+        month_earnings = float(month_earnings_result) if month_earnings_result else 0.0
         
-        earnings_values.append(float(month_earnings))
+        earnings_values.append(month_earnings)
         labels.append(month_start.strftime('%b %Y'))
     
-    # Get transaction history (including withdrawals, fees, etc.)
+    # Get transaction history - FIXED: Use actual data
     transactions = []
+    
     # Add completed jobs as transactions
     for job in paginated_jobs.items:
         if job.actual_price:
@@ -1099,50 +1350,95 @@ def earnings():
                 'job_id': job.id
             })
     
-    # Add placeholder for withdrawals (you would fetch these from a Withdrawal model)
-    withdrawals = []  # Replace with actual withdrawals query
+    # Get actual withdrawals from Withdrawal model
+    withdrawals = Withdrawal.query.filter_by(artisan_id=current_user.id).all()
     for withdrawal in withdrawals:
         transactions.append({
             'id': withdrawal.id,
             'type': 'debit',
             'amount': float(withdrawal.amount),
-            'description': 'Withdrawal',
-            'date': withdrawal.created_at,
+            'description': f'Withdrawal - {withdrawal.method}',
+            'date': withdrawal.requested_at,
             'status': withdrawal.status,
-            'notes': f'Processed via {withdrawal.payment_method}'
+            'notes': withdrawal.account_details
+        })
+    
+    # Get payment transactions
+    payments = PaymentTransaction.query.filter_by(user_id=current_user.id).all()
+    for payment in payments:
+        transactions.append({
+            'id': payment.id,
+            'type': 'payment' if payment.transaction_status == 'completed' else 'pending',
+            'amount': float(payment.amount),
+            'description': f'Payment - {payment.payment_method}',
+            'date': payment.created_at,
+            'status': payment.transaction_status,
+            'reference': payment.transaction_reference
         })
     
     # Sort transactions by date
     transactions.sort(key=lambda x: x['date'], reverse=True)
     
-    # Calculate average rating
-    average_rating = current_user.rating or 0
+    # Calculate average rating - FIXED: Get from reviews
+    reviews = Review.query.filter_by(reviewee_id=current_user.id).all()
+    if reviews:
+        average_rating = sum(review.rating for review in reviews) / len(reviews)
+    else:
+        average_rating = 0.0
     
-    # Calculate success rate
+    # Calculate success rate - FIXED
     total_assigned_jobs = ServiceRequest.query.filter_by(
         artisan_id=current_user.id
     ).count()
-    success_rate = (total_completed_jobs / total_assigned_jobs * 100) if total_assigned_jobs > 0 else 0
+    success_rate = (total_completed_jobs / total_assigned_jobs * 100) if total_assigned_jobs > 0 else 0.0
+    
+    # Get actual withdrawal totals
+    total_withdrawals_result = db.session.query(db.func.coalesce(db.func.sum(Withdrawal.amount), 0))\
+        .filter(Withdrawal.artisan_id == current_user.id,
+                Withdrawal.status == 'completed')\
+        .scalar()
+    total_withdrawals = float(total_withdrawals_result) if total_withdrawals_result else 0.0
+    
+    pending_withdrawals_result = db.session.query(db.func.coalesce(db.func.sum(Withdrawal.amount), 0))\
+        .filter(Withdrawal.artisan_id == current_user.id,
+                Withdrawal.status == 'pending')\
+        .scalar()
+    pending_withdrawals = float(pending_withdrawals_result) if pending_withdrawals_result else 0.0
+    
+    # Calculate available balance (total earnings - completed withdrawals)
+    available_balance = total_earnings - total_withdrawals
+    
+    # Calculate pending balance (for pending withdrawals)
+    pending_balance = pending_withdrawals
+    
+    # If artisan has artisan_profile, use its financial fields
+    if current_user.artisan_profile:
+        current_user.artisan_profile.total_earnings = total_earnings
+        current_user.artisan_profile.available_balance = available_balance
+        current_user.artisan_profile.pending_balance = pending_balance
+        db.session.commit()
     
     stats = {
-        'total_earnings': float(total_earnings),
-        'monthly_earnings': float(monthly_earnings),
-        'last_month_earnings': float(last_month_earnings),
+        'total_earnings': round(total_earnings, 2),
+        'monthly_earnings': round(monthly_earnings, 2),
+        'last_month_earnings': round(last_month_earnings, 2),
         'completed_jobs': total_completed_jobs,
-        'average_rating': float(average_rating),
+        'average_rating': round(average_rating, 1),
         'success_rate': round(success_rate, 1),
-        'available_balance': float(total_earnings),  # In reality, subtract withdrawals
-        'total_withdrawals': 0,  # Calculate from withdrawals table
-        'pending_withdrawals': 0,
+        'available_balance': round(available_balance, 2),
+        'total_withdrawals': round(total_withdrawals, 2),
+        'pending_withdrawals': round(pending_withdrawals, 2),
+        'pending_balance': round(pending_balance, 2),
+        'total_jobs': total_assigned_jobs
     }
     
     if request.is_json:
         return jsonify({
             'stats': stats,
-            'transactions': transactions[:10],
+            'transactions': transactions[:per_page],
             'earnings_data': {
                 'labels': labels,
-                'values': earnings_values  # Use earnings_values, not .values()
+                'values': earnings_values
             },
             'pagination': {
                 'page': page,
@@ -1157,14 +1453,14 @@ def earnings():
                               transactions=transactions[:20],
                               earnings_data={
                                   'labels': labels,
-                                  'values': earnings_values  # Use earnings_values, not .values()
+                                  'values': earnings_values
                               },
                               jobs=paginated_jobs.items,
                               pagination=paginated_jobs,
                               start_date=start_date,
                               end_date=end_date,
                               page=page)
-    
+        
 # Notifications
 @artisan_bp.route('/notifications', methods=['GET'])
 @artisan_required
@@ -1175,8 +1471,7 @@ def artisan_notifications():
     
     # Base query
     query = Notification.query.filter_by(
-        user_id=current_user.id,
-        user_type='artisan'
+        user_id=current_user.id
     )
     
     # Apply filters
@@ -1191,13 +1486,11 @@ def artisan_notifications():
     
     # Get counts for stats
     total_count = Notification.query.filter_by(
-        user_id=current_user.id,
-        user_type='artisan'
+        user_id=current_user.id
     ).count()
     
     unread_count = Notification.query.filter_by(
         user_id=current_user.id,
-        user_type='artisan',
         is_read=False
     ).count()
     
@@ -1206,7 +1499,6 @@ def artisan_notifications():
     first_day_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     this_month_count = Notification.query.filter(
         Notification.user_id == current_user.id,
-        Notification.user_type == 'artisan',
         Notification.created_at >= first_day_of_month
     ).count()
     
@@ -1313,7 +1605,6 @@ def delete_notification(notification_id):
 def delete_all_read_notifications():
     deleted = Notification.query.filter_by(
         user_id=current_user.id,
-        user_type='artisan',
         is_read=True
     ).delete()
     

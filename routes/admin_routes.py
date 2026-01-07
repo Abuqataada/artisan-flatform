@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for
 from flask_login import login_required, current_user
 from functools import wraps
-from models import db, Admin, User, Artisan, ServiceRequest, ServiceCategory, Notification
+from models import db, User, ServiceRequest, ServiceCategory, Notification
 from datetime import datetime, timedelta
 import json
 
@@ -12,7 +12,7 @@ def admin_required(f):
     @wraps(f)
     @login_required
     def decorated(*args, **kwargs):
-        if not isinstance(current_user, Admin):
+        if current_user.user_type != 'admin':
             if request.is_json:
                 return jsonify({'error': 'Admin access required'}), 403
             else:
@@ -26,12 +26,12 @@ def admin_required(f):
 def admin_dashboard():
     # Get statistics
     total_users = User.query.count()
-    total_artisans = Artisan.query.count()
+    total_artisans = User.query.filter_by(user_type='artisan').count()
     total_requests = ServiceRequest.query.count()
     pending_requests = ServiceRequest.query.filter_by(status='pending').count()
     active_requests = ServiceRequest.query.filter_by(status='in_progress').count()
     completed_requests = ServiceRequest.query.filter_by(status='completed').count()
-    pending_verifications = Artisan.query.filter_by(is_verified=False).count()
+    pending_verifications = User.query.filter_by(user_type='artisan', is_verified=False).count()
     
     # Recent requests
     recent_requests = ServiceRequest.query\
@@ -40,8 +40,8 @@ def admin_dashboard():
         .all()
     
     # Pending verifications
-    pending_artisans = Artisan.query.filter_by(is_verified=False)\
-        .order_by(Artisan.created_at.desc())\
+    pending_artisans = User.query.filter_by(user_type='artisan', is_verified=False)\
+        .order_by(User.created_at.desc())\
         .limit(5)\
         .all()
     
@@ -115,7 +115,7 @@ def manage_user(user_id):
 @admin_bp.route('/artisans', methods=['GET'])
 @admin_required
 def manage_artisans():
-    artisans = Artisan.query.all()
+    artisans = User.query.filter_by(user_type='artisan').all()
     
     if request.is_json:
         return jsonify({'artisans': [artisan.to_dict() for artisan in artisans]})
@@ -125,7 +125,7 @@ def manage_artisans():
 @admin_bp.route('/artisans/pending-verification', methods=['GET'])
 @admin_required
 def get_pending_verification():
-    artisans = Artisan.query.filter_by(is_verified=False).all()
+    artisans = User.query.filter_by(user_type='artisan', is_verified=False).all()
     
     if request.is_json:
         return jsonify({'artisans': [artisan.to_dict() for artisan in artisans]})
@@ -135,7 +135,7 @@ def get_pending_verification():
 @admin_bp.route('/artisans/<artisan_id>/verify', methods=['PUT'])
 @admin_required
 def verify_artisan(artisan_id):
-    artisan = Artisan.query.get_or_404(artisan_id)
+    artisan = User.query.get_or_404(artisan_id)
     
     data = request.get_json()
     artisan.is_verified = data.get('verified', True)
@@ -156,7 +156,7 @@ def verify_artisan(artisan_id):
 @admin_bp.route('/artisans/<artisan_id>', methods=['GET', 'PUT', 'DELETE'])
 @admin_required
 def manage_artisan(artisan_id):
-    artisan = Artisan.query.get_or_404(artisan_id)
+    artisan = User.query.get_or_404(artisan_id)
     
     if request.method == 'GET':
         if request.is_json:
@@ -209,7 +209,8 @@ def view_request_admin(request_id):
     service_request = ServiceRequest.query.get_or_404(request_id)
     
     # Get available artisans for this category
-    available_artisans = Artisan.query.filter_by(
+    available_artisans = User.query.filter_by(
+        user_type='artisan',
         category=service_request.category.name,
         is_verified=True,
         is_active=True
@@ -236,7 +237,7 @@ def assign_artisan(request_id):
     data = request.get_json()
     artisan_id = data['artisan_id']
     
-    artisan = Artisan.query.get_or_404(artisan_id)
+    artisan = User.query.get_or_404(artisan_id)
     
     # Check artisan availability
     if artisan.availability != 'available':
@@ -492,7 +493,7 @@ def create_category():
 @admin_required
 def view_artisan(artisan_id):
     """View artisan details page"""
-    artisan = Artisan.query.get_or_404(artisan_id)
+    artisan = User.query.get_or_404(artisan_id)
     
     if request.is_json:
         return jsonify(artisan.to_dict())

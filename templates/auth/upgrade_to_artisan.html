@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Become an Artisan</h3>
+                    <p class="mb-0">Complete your artisan profile</p>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <p><strong>Account Information:</strong></p>
+                        <p>Email: {{ user.email }}</p>
+                        <p>Name: {{ user.full_name }}</p>
+                        <p>Phone: {{ user.phone }}</p>
+                    </div>
+                    
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label for="category">Service Category *</label>
+                            <select class="form-control" id="category" name="category" required>
+                                <option value="">Select a category</option>
+                                {% for category in categories %}
+                                <option value="{{ category.name }}">{{ category.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="skills">Skills *</label>
+                            <textarea class="form-control" id="skills" name="skills" 
+                                      rows="3" placeholder="List your skills (comma-separated)" required></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="experience_years">Years of Experience</label>
+                            <input type="number" class="form-control" id="experience_years" 
+                                   name="experience_years" min="0" max="50" value="0">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="credentials">Certifications/Credentials</label>
+                            <textarea class="form-control" id="credentials" name="credentials" 
+                                      rows="2" placeholder="List your certifications (comma-separated)"></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="portfolio_images">Portfolio Images</label>
+                            <input type="file" class="form-control-file" id="portfolio_images" 
+                                   name="portfolio_images" multiple accept="image/*">
+                            <small class="form-text text-muted">Upload images of your previous work</small>
+                        </div>
+                        
+                        <div class="form-group form-check">
+                            <input type="checkbox" class="form-check-input" id="terms" required>
+                            <label class="form-check-label" for="terms">
+                                I agree to the <a href="">Terms of Service</a>
+                                and understand that my account requires verification
+                            </label>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-lg btn-block">
+                            Submit for Verification
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
