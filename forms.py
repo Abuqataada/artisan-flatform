@@ -164,3 +164,127 @@ class PaymentForm(FlaskForm):
                 return False
         
         return True
+    
+
+# Add to forms.py
+
+from wtforms import DateField, FileField
+from flask_wtf.file import FileRequired, FileAllowed
+
+class ArtisanKYCForm(FlaskForm):
+    """Form for artisan KYC verification"""
+    nin = StringField('National Identification Number (NIN)', 
+                     validators=[DataRequired(), Length(min=11, max=11)],
+                     render_kw={"placeholder": "11-digit NIN number"})
+    
+    date_of_birth = DateField('Date of Birth', validators=[DataRequired()],
+                             format='%Y-%m-%d',
+                             render_kw={"placeholder": "YYYY-MM-DD"})
+    
+    nationality = SelectField('Nationality', 
+                            validators=[DataRequired()],
+                            choices=[
+                                ('Nigerian', 'Nigerian'),
+                                ('other', 'Other Nationality')
+                            ])
+    
+    state_of_origin = StringField('State of Origin', 
+                                 validators=[DataRequired(), Length(min=2, max=100)],
+                                 render_kw={"placeholder": "e.g., Lagos, Rivers, etc."})
+    
+    lga_of_origin = StringField('Local Government Area (LGA)', 
+                               validators=[DataRequired(), Length(min=2, max=100)],
+                               render_kw={"placeholder": "Your Local Government Area"})
+    
+    # Bank Information
+    bank_name = SelectField('Bank Name', validators=[DataRequired()], choices=[
+        ('', 'Select Bank'),
+        ('zenith', 'Zenith Bank'),
+        ('gtb', 'GTBank'),
+        ('access', 'Access Bank'),
+        ('first', 'First Bank'),
+        ('uba', 'UBA'),
+        ('fidelity', 'Fidelity Bank'),
+        ('stanbic', 'Stanbic IBTC'),
+        ('union', 'Union Bank'),
+        ('ecobank', 'Ecobank'),
+        ('polaris', 'Polaris Bank'),
+        ('wema', 'Wema Bank'),
+        ('sterling', 'Sterling Bank'),
+        ('other', 'Other')
+    ])
+    
+    account_name = StringField('Account Name', 
+                              validators=[DataRequired(), Length(min=2, max=100)],
+                              render_kw={"placeholder": "As it appears on bank statement"})
+    
+    account_number = StringField('Account Number', 
+                                validators=[DataRequired(), Length(min=10, max=10)],
+                                render_kw={"placeholder": "10-digit account number"})
+    
+    # Document Uploads
+    nin_front_image = FileField('NIN Front Image', 
+                               validators=[
+                                   FileRequired(),
+                                   FileAllowed(['jpg', 'jpeg', 'png', 'pdf'], 'Images and PDFs only!')
+                               ])
+    
+    nin_back_image = FileField('NIN Back Image (Optional)', 
+                              validators=[
+                                  FileAllowed(['jpg', 'jpeg', 'png', 'pdf'], 'Images and PDFs only!')
+                              ])
+    
+    passport_photo = FileField('Passport Photograph', 
+                              validators=[
+                                  FileRequired(),
+                                  FileAllowed(['jpg', 'jpeg', 'png'], 'Images only!')
+                              ])
+    
+    proof_of_address = FileField('Proof of Address', 
+                                validators=[
+                                    FileRequired(),
+                                    FileAllowed(['jpg', 'jpeg', 'png', 'pdf'], 'Images and PDFs only!')
+                                ])
+    
+    other_documents = FileField('Other Verification Documents (Optional)', 
+                               validators=[
+                                   FileAllowed(['jpg', 'jpeg', 'png', 'pdf'], 'Images and PDFs only!')
+                               ])
+    
+    # Terms and conditions
+    certify_truth = BooleanField('I certify that all information provided is true and accurate',
+                                validators=[DataRequired()])
+    
+    authorize_verification = BooleanField('I authorize Uwaila Global to verify my KYC details',
+                                         validators=[DataRequired()])
+    
+    submit = SubmitField('Submit for Verification')
+    
+    def validate(self, extra_validators=None):
+        """Custom validation for NIN"""
+        initial_validation = super(ArtisanKYCForm, self).validate()
+        if not initial_validation:
+            return False
+        
+        # Validate NIN format (11 digits)
+        if not self.nin.data.isdigit() or len(self.nin.data) != 11:
+            self.nin.errors.append('NIN must be 11 digits')
+            return False
+        
+        # Validate account number (10 digits)
+        if not self.account_number.data.isdigit() or len(self.account_number.data) != 10:
+            self.account_number.errors.append('Account number must be 10 digits')
+            return False
+        
+        # Validate date of birth (must be at least 18 years old)
+        if self.date_of_birth.data:
+            from datetime import date
+            today = date.today()
+            age = today.year - self.date_of_birth.data.year - (
+                (today.month, today.day) < (self.date_of_birth.data.month, self.date_of_birth.data.day)
+            )
+            if age < 18:
+                self.date_of_birth.errors.append('You must be at least 18 years old')
+                return False
+        
+        return True

@@ -1,7 +1,8 @@
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from functools import wraps
-from models import db, User, ServiceRequest, ServiceCategory, Notification, ArtisanProfile, Withdrawal, PaymentTransaction, Review, AccountDeactivation, VerificationRequest
+from models import db, User, ServiceRequest, ServiceCategory, Notification, ArtisanProfile, Withdrawal, PaymentTransaction, Review, AccountDeactivation, VerificationRequest, ArtisanKYCVerification
+from forms import ArtisanKYCForm
 import json
 import os
 from werkzeug.utils import secure_filename
@@ -164,12 +165,51 @@ def register():
                                       categories=service_categories,
                                       error='Email already registered')
         
+        # Check if NIN already exists
+        if User.query.filter_by(nin=data.get('nin')).first():
+            if request.is_json:
+                return jsonify({'error': 'NIN already registered'}), 400
+            else:
+                return render_template('auth/artisan_register.html', 
+                                      categories=service_categories,
+                                      error='NIN already registered')
+        
+        # Validate NIN (11 digits)
+        if not data.get('nin') or not data['nin'].isdigit() or len(data['nin']) != 11:
+            if request.is_json:
+                return jsonify({'error': 'Invalid NIN. Must be 11 digits'}), 400
+            else:
+                return render_template('auth/artisan_register.html', 
+                                      categories=service_categories,
+                                      error='Invalid NIN. Must be 11 digits')
+        
+        # Validate date of birth (must be at least 18 years old)
+        try:
+            dob = datetime.strptime(data.get('date_of_birth'), '%Y-%m-%d')
+            today = datetime.now()
+            age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+            if age < 18:
+                if request.is_json:
+                    return jsonify({'error': 'You must be at least 18 years old'}), 400
+                else:
+                    return render_template('auth/artisan_register.html', 
+                                          categories=service_categories,
+                                          error='You must be at least 18 years old')
+        except ValueError:
+            if request.is_json:
+                return jsonify({'error': 'Invalid date of birth'}), 400
+            else:
+                return render_template('auth/artisan_register.html', 
+                                      categories=service_categories,
+                                      error='Invalid date of birth')
+        
         # 1. Create new User (base user)
         user = User(
             email=data['email'],
             phone=data['phone'],
             full_name=data['full_name'],
             address=data.get('address', ''),
+            nin=data['nin'],  # Store NIN at user level
             user_type='artisan',  # CRITICAL: Set user_type
             is_verified=False  # Requires admin verification
         )
@@ -178,13 +218,28 @@ def register():
         db.session.add(user)
         db.session.flush()  # Get user ID without committing
         
-        # 2. Create ArtisanProfile with artisan-specific fields
+        # 2. Create ArtisanProfile with artisan-specific fields including KYC
         artisan_profile = ArtisanProfile(
             user_id=user.id,
             category=data['category'],
             skills=data.get('skills', ''),
             experience_years=int(data.get('experience_years', 0)),
-            availability='available'
+            availability='available',
+            
+            # KYC Information
+            nin=data['nin'],
+            kyc_status='pending',  # Default status
+            kyc_submitted_at=datetime.now(timezone.utc),
+            
+            # Personal Information
+            date_of_birth=dob,
+            state_of_origin=data.get('state_of_origin', ''),
+            lga_of_origin=data.get('lga_of_origin', ''),
+            
+            # Bank Information
+            bank_name=data.get('other_bank_name') if data.get('bank_name') == 'other' else data.get('bank_name'),
+            account_name=data.get('account_name', ''),
+            account_number=data.get('account_number', '')
         )
         
         # Handle credentials (JSON array)
@@ -198,9 +253,7 @@ def register():
             uploaded_files = request.files.getlist('portfolio_images')
             for file in uploaded_files:
                 if file and file.filename:
-                    # Save file logic here
                     filename = secure_filename(file.filename)
-                    # Save to upload folder
                     file_path = os.path.join(
                         current_app.config['UPLOAD_FOLDER'], 
                         'portfolio', 
@@ -214,12 +267,12 @@ def register():
         
         db.session.add(artisan_profile)
         
-        # Create notification for admin
+        # Create notification for admin about new artisan with KYC pending
         notification = Notification(
             user_id='admin',  # You need to get actual admin user ID
-            title='New Artisan Registration',
-            message=f'New artisan registered: {user.full_name} ({artisan_profile.category})',
-            notification_type='new_artisan',
+            title='New Artisan Registration with KYC Pending',
+            message=f'New artisan registered: {user.full_name} ({artisan_profile.category}). NIN: {data["nin"]}. KYC verification required.',
+            notification_type='new_artisan_kyc_pending',
             related_id=user.id
         )
         db.session.add(notification)
@@ -228,22 +281,38 @@ def register():
         artisan_notification = Notification(
             user_id=user.id,
             title='Registration Successful',
-            message='Your registration is pending admin verification.',
+            message='Your registration is pending admin verification. Please complete KYC verification in your profile.',
             notification_type='registration_pending'
         )
         db.session.add(artisan_notification)
+        
+        # Create KYC verification request record
+        kyc_verification = ArtisanKYCVerification(
+            artisan_profile_id=artisan_profile.id,
+            nin=data['nin'],
+            date_of_birth=dob,
+            nationality='Nigerian',  # Default for now
+            state_of_origin=data.get('state_of_origin', ''),
+            lga_of_origin=data.get('lga_of_origin', ''),
+            bank_name=data.get('other_bank_name') if data.get('bank_name') == 'other' else data.get('bank_name'),
+            account_name=data.get('account_name', ''),
+            account_number=data.get('account_number', ''),
+            status='pending'
+        )
+        db.session.add(kyc_verification)
         
         db.session.commit()
         
         if request.is_json:
             return jsonify({
                 'message': 'Registration submitted for verification',
-                'user': user.to_dict()
+                'user': user.to_dict(),
+                'kyc_status': 'pending'
             }), 201
         else:
             return render_template('auth/registration_success.html',
-                                  message='Registration submitted for verification')
- 
+                                  message='Registration submitted for verification. KYC verification is pending.')
+         
 @artisan_bp.route('/dashboard')
 @artisan_required
 def artisan_dashboard():
@@ -320,6 +389,277 @@ def artisan_dashboard():
                               notifications=notifications,
                               unread_notifications=unread_count)
 
+@artisan_bp.route('/kyc/verify', methods=['GET', 'POST'])
+@artisan_required
+def kyc_verification():
+    """Handle KYC verification for artisans"""
+    
+    # Check if artisan already has a profile
+    if not current_user.artisan_profile:
+        flash('Artisan profile not found', 'danger')
+        return redirect(url_for('artisan_bp.artisan_profile'))
+    
+    artisan_profile = current_user.artisan_profile
+    
+    # Check KYC status
+    if artisan_profile.kyc_status == 'verified':
+        flash('Your KYC is already verified', 'info')
+        return redirect(url_for('artisan_bp.artisan_profile'))
+    
+    form = ArtisanKYCForm()
+    
+    if request.method == 'GET':
+        # Pre-populate form with existing data
+        if artisan_profile.nin:
+            form.nin.data = artisan_profile.nin
+        if artisan_profile.date_of_birth:
+            form.date_of_birth.data = artisan_profile.date_of_birth
+        if artisan_profile.state_of_origin:
+            form.state_of_origin.data = artisan_profile.state_of_origin
+        if artisan_profile.lga_of_origin:
+            form.lga_of_origin.data = artisan_profile.lga_of_origin
+        if artisan_profile.bank_name:
+            form.bank_name.data = artisan_profile.bank_name
+        if artisan_profile.account_name:
+            form.account_name.data = artisan_profile.account_name
+        if artisan_profile.account_number:
+            form.account_number.data = artisan_profile.account_number
+    
+    if form.validate_on_submit():
+        try:
+            # Save uploaded files
+            uploaded_files = {}
+            document_fields = ['nin_front_image', 'nin_back_image', 'passport_photo', 'proof_of_address', 'other_documents']
+            
+            for field_name in document_fields:
+                file = getattr(form, field_name).data
+                if file and hasattr(file, 'filename') and file.filename:
+                    filename = secure_filename(f"{current_user.id}_{field_name}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{file.filename}")
+                    file_path = os.path.join(
+                        current_app.config['UPLOAD_FOLDER'],
+                        'kyc_documents',
+                        filename
+                    )
+                    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                    file.save(file_path)
+                    uploaded_files[field_name] = f'kyc_documents/{filename}'
+            
+            # Update artisan profile with KYC data
+            artisan_profile.nin = form.nin.data
+            artisan_profile.date_of_birth = form.date_of_birth.data
+            artisan_profile.state_of_origin = form.state_of_origin.data
+            artisan_profile.lga_of_origin = form.lga_of_origin.data
+            artisan_profile.bank_name = form.bank_name.data
+            artisan_profile.account_name = form.account_name.data
+            artisan_profile.account_number = form.account_number.data
+            
+            # Update KYC document URLs
+            if 'nin_front_image' in uploaded_files:
+                artisan_profile.nin_front_image = uploaded_files['nin_front_image']
+            if 'nin_back_image' in uploaded_files:
+                artisan_profile.nin_back_image = uploaded_files['nin_back_image']
+            if 'passport_photo' in uploaded_files:
+                artisan_profile.passport_photo = uploaded_files['passport_photo']
+            if 'proof_of_address' in uploaded_files:
+                artisan_profile.proof_of_address = uploaded_files['proof_of_address']
+            
+            # Save other documents as JSON array
+            other_docs = []
+            for key, value in uploaded_files.items():
+                if key not in ['nin_front_image', 'nin_back_image', 'passport_photo', 'proof_of_address']:
+                    other_docs.append(value)
+            if other_docs:
+                artisan_profile.other_verification_docs = json.dumps(other_docs)
+            
+            # Update KYC status
+            artisan_profile.kyc_status = 'submitted'
+            artisan_profile.kyc_submitted_at = datetime.now(timezone.utc)
+            
+            # Create KYC verification request
+            kyc_request = ArtisanKYCVerification(
+                artisan_profile_id=artisan_profile.id,
+                nin=form.nin.data,
+                date_of_birth=form.date_of_birth.data,
+                nationality=form.nationality.data,
+                state_of_origin=form.state_of_origin.data,
+                lga_of_origin=form.lga_of_origin.data,
+                bank_name=form.bank_name.data,
+                account_name=form.account_name.data,
+                account_number=form.account_number.data,
+                nin_front_image=uploaded_files.get('nin_front_image', ''),
+                nin_back_image=uploaded_files.get('nin_back_image', ''),
+                passport_photo=uploaded_files.get('passport_photo', ''),
+                proof_of_address=uploaded_files.get('proof_of_address', ''),
+                other_documents=json.dumps(other_docs) if other_docs else None,
+                status='pending'
+            )
+            db.session.add(kyc_request)
+            
+            # Create notification for admin
+            admin_notification = Notification(
+                user_id='admin',  # Replace with actual admin ID
+                title='Artisan KYC Verification Submitted',
+                message=f'Artisan {current_user.full_name} has submitted KYC verification. NIN: {form.nin.data}',
+                notification_type='kyc_submitted',
+                related_id=artisan_profile.id
+            )
+            db.session.add(admin_notification)
+            
+            # Create notification for artisan
+            artisan_notification = Notification(
+                user_id=current_user.id,
+                title='KYC Verification Submitted',
+                message='Your KYC verification has been submitted and is pending admin review.',
+                notification_type='kyc_submitted'
+            )
+            db.session.add(artisan_notification)
+            
+            db.session.commit()
+            
+            flash('KYC verification submitted successfully! It will be reviewed within 24-48 hours.', 'success')
+            return redirect(url_for('artisan_bp.artisan_profile'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error submitting KYC verification: {str(e)}', 'danger')
+    
+    return render_template('artisan/kyc_verification.html',
+                          form=form,
+                          kyc_status=artisan_profile.kyc_status,
+                          is_kyc_verified=artisan_profile.kyc_status == 'verified')
+
+
+@artisan_bp.route('/kyc/status', methods=['GET'])
+@artisan_required
+def kyc_status():
+    """Check KYC verification status"""
+    
+    if not current_user.artisan_profile:
+        return jsonify({'error': 'Artisan profile not found'}), 404
+    
+    artisan_profile = current_user.artisan_profile
+    
+    # Get latest KYC verification request
+    latest_kyc = ArtisanKYCVerification.query.filter_by(
+        artisan_profile_id=artisan_profile.id
+    ).order_by(ArtisanKYCVerification.created_at.desc()).first()
+    
+    response = {
+        'kyc_status': artisan_profile.kyc_status,
+        'nin': artisan_profile.nin,
+        'kyc_submitted_at': artisan_profile.kyc_submitted_at.isoformat() if artisan_profile.kyc_submitted_at else None,
+        'kyc_verified_at': artisan_profile.kyc_verified_at.isoformat() if artisan_profile.kyc_verified_at else None,
+        'is_verified': artisan_profile.kyc_status == 'verified'
+    }
+    
+    if latest_kyc:
+        response['latest_request'] = {
+            'id': latest_kyc.id,
+            'status': latest_kyc.status,
+            'submitted_at': latest_kyc.created_at.isoformat(),
+            'reviewed_at': latest_kyc.reviewed_at.isoformat() if latest_kyc.reviewed_at else None,
+            'review_notes': latest_kyc.review_notes,
+            'rejection_reason': latest_kyc.rejection_reason
+        }
+    
+    if request.is_json:
+        return jsonify(response)
+    else:
+        return render_template('artisan/kyc_status.html',
+                              kyc_info=response,
+                              artisan_profile=artisan_profile)
+
+
+@artisan_bp.route('/kyc/update-bank', methods=['POST'])
+@artisan_required
+def update_bank_details():
+    """Update bank account details"""
+    
+    if not current_user.artisan_profile:
+        return jsonify({'error': 'Artisan profile not found'}), 404
+    
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+    
+    artisan_profile = current_user.artisan_profile
+    
+    try:
+        # Validate bank details
+        required_fields = ['bank_name', 'account_name', 'account_number']
+        for field in required_fields:
+            if field not in data or not data[field]:
+                return jsonify({'error': f'{field.replace("_", " ").title()} is required'}), 400
+        
+        # Validate account number
+        if not data['account_number'].isdigit() or len(data['account_number']) != 10:
+            return jsonify({'error': 'Account number must be 10 digits'}), 400
+        
+        # Update bank details
+        artisan_profile.bank_name = data['bank_name']
+        artisan_profile.account_name = data['account_name']
+        artisan_profile.account_number = data['account_number']
+        
+        # If KYC is verified, create a new verification request for bank change
+        if artisan_profile.kyc_status == 'verified':
+            # Change KYC status to pending for re-verification
+            artisan_profile.kyc_status = 'pending'
+            
+            # Create new KYC verification request for bank update
+            kyc_request = ArtisanKYCVerification(
+                artisan_profile_id=artisan_profile.id,
+                nin=artisan_profile.nin,
+                date_of_birth=artisan_profile.date_of_birth,
+                nationality=artisan_profile.nationality or 'Nigerian',
+                state_of_origin=artisan_profile.state_of_origin,
+                lga_of_origin=artisan_profile.lga_of_origin,
+                bank_name=data['bank_name'],
+                account_name=data['account_name'],
+                account_number=data['account_number'],
+                nin_front_image=artisan_profile.nin_front_image or '',
+                nin_back_image=artisan_profile.nin_back_image or '',
+                passport_photo=artisan_profile.passport_photo or '',
+                proof_of_address=artisan_profile.proof_of_address or '',
+                other_documents=artisan_profile.other_verification_docs,
+                status='pending',
+                review_notes='Bank details update - requires re-verification'
+            )
+            db.session.add(kyc_request)
+            
+            # Create notifications
+            admin_notification = Notification(
+                user_id='admin',  # Replace with actual admin ID
+                title='Artisan Bank Details Updated',
+                message=f'Artisan {current_user.full_name} updated bank details. Requires re-verification.',
+                notification_type='bank_update',
+                related_id=artisan_profile.id
+            )
+            db.session.add(admin_notification)
+            
+            artisan_notification = Notification(
+                user_id=current_user.id,
+                title='Bank Details Updated',
+                message='Your bank details have been updated and are pending re-verification.',
+                notification_type='bank_update'
+            )
+            db.session.add(artisan_notification)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Bank details updated successfully',
+            'kyc_status': artisan_profile.kyc_status,
+            'bank_details': {
+                'bank_name': artisan_profile.bank_name,
+                'account_name': artisan_profile.account_name,
+                'account_number': artisan_profile.account_number
+            }
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to update bank details: {str(e)}'}), 500
+                
 # Add these helper functions if not already defined
 def calculate_response_rate(artisan_id):
     """Calculate artisan's response rate to job requests"""

@@ -5,7 +5,7 @@ import os
 from werkzeug.utils import secure_filename
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash
-from models import db, User, ServiceRequest, ServiceCategory, Notification, ArtisanProfile, ServiceRequest, Payment
+from models import db, User, ServiceRequest, ServiceCategory, Notification, ArtisanProfile, ServiceRequest, Payment, ArtisanKYCVerification, VerificationRequest
 from datetime import datetime, timedelta, timezone
 import json
 from forms import LoginForm, UserRegistrationForm, ServiceRequestForm, BankAccountForm, ArtisanRegistrationForm, ServiceRequestForm, PaymentForm
@@ -158,14 +158,34 @@ def upgrade_to_artisan():
             user.user_type = 'artisan'
             user.is_verified = False  # Require verification again
             
-            # 2. Create ArtisanProfile
+            # Update user address if provided
+            if data.get('address'):
+                user.address = data['address']
+            
+            # 2. Create ArtisanProfile with KYC and bank details
             artisan_profile = ArtisanProfile(
                 user_id=user.id,
                 category=data['category'],
                 skills=data.get('skills', ''),
                 experience_years=int(data.get('experience_years', 0)),
-                availability='available'
+                availability='available' if data.get('availability') else 'unavailable',
+                
+                # KYC Information
+                nin=data.get('nin', ''),
+                date_of_birth=datetime.strptime(data['date_of_birth'], '%Y-%m-%d').date() if data.get('date_of_birth') else None,
+                state_of_origin=data.get('state_of_origin', ''),
+                lga_of_origin=data.get('lga_of_origin', ''),
+                kyc_status='pending',  # Start with pending status
+                
+                # Bank Information
+                bank_name=data.get('bank_name', ''),
+                account_name=data.get('account_name', ''),
+                account_number=data.get('account_number', '')
             )
+            
+            # Handle "Other" bank name
+            if data.get('bank_name') == 'other' and data.get('other_bank_name'):
+                artisan_profile.bank_name = data['other_bank_name']
             
             # Handle credentials
             if data.get('credentials'):
@@ -179,51 +199,116 @@ def upgrade_to_artisan():
                 for file in uploaded_files:
                     if file and file.filename:
                         filename = secure_filename(file.filename)
-                        file_path = os.path.join(
-                            current_app.config['UPLOAD_FOLDER'], 
-                            'portfolio', 
-                            filename
-                        )
+                        # Create portfolio directory if it doesn't exist
+                        portfolio_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'portfolio')
+                        os.makedirs(portfolio_dir, exist_ok=True)
+                        
+                        file_path = os.path.join(portfolio_dir, filename)
                         file.save(file_path)
                         portfolio_images.append(f'portfolio/{filename}')
             
             if portfolio_images:
                 artisan_profile.portfolio_images = json.dumps(portfolio_images)
             
+            # Handle KYC document uploads (if provided during upgrade)
+            kyc_docs = []
+            if 'nin_front_image' in request.files and request.files['nin_front_image'].filename:
+                file = request.files['nin_front_image']
+                filename = secure_filename(file.filename)
+                kyc_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'kyc')
+                os.makedirs(kyc_dir, exist_ok=True)
+                file_path = os.path.join(kyc_dir, filename)
+                file.save(file_path)
+                artisan_profile.nin_front_image = f'kyc/{filename}'
+                kyc_docs.append(f'kyc/{filename}')
+            
+            # Add more KYC document handling as needed...
+            
+            # Set KYC submission timestamp
+            artisan_profile.kyc_submitted_at = datetime.now(timezone.utc)
+            
             db.session.add(artisan_profile)
             
-            # 3. Create notification for admin
+            # 3. Create a KYC verification record for admin review
+            kyc_verification = ArtisanKYCVerification(
+                artisan_profile_id=artisan_profile.id,
+                nin=data.get('nin', ''),
+                date_of_birth=datetime.strptime(data['date_of_birth'], '%Y-%m-%d').date() if data.get('date_of_birth') else None,
+                state_of_origin=data.get('state_of_origin', ''),
+                lga_of_origin=data.get('lga_of_origin', ''),
+                status='pending',
+                
+                # Bank information for verification
+                bank_name=artisan_profile.bank_name,
+                account_name=artisan_profile.account_name,
+                account_number=artisan_profile.account_number,
+                
+                # Document URLs (would need to be uploaded separately or point to profile)
+                nin_front_image=artisan_profile.nin_front_image if artisan_profile.nin_front_image else '',
+                nin_back_image=artisan_profile.nin_back_image if artisan_profile.nin_back_image else '',
+                passport_photo=artisan_profile.passport_photo if artisan_profile.passport_photo else '',
+                proof_of_address=artisan_profile.proof_of_address if artisan_profile.proof_of_address else ''
+            )
+            
+            db.session.add(kyc_verification)
+            
+            # 4. Create notification for admin
             notification = Notification(
-                user_id='admin',  # Replace with actual admin ID
-                title='Customer Upgraded to Artisan',
-                message=f'{user.full_name} ({user.email}) has upgraded to artisan in {artisan_profile.category}',
-                notification_type='artisan_upgrade',
+                user_id='admin',  # Replace with actual admin ID or find admin users
+                title='Customer Upgraded to Artisan - KYC Pending',
+                message=f'{user.full_name} ({user.email}) has upgraded to artisan in {artisan_profile.category}. KYC verification required.',
+                notification_type='artisan_upgrade_kyc',
                 related_id=user.id
             )
             db.session.add(notification)
             
-            # 4. Create notification for user
+            # 5. Create notification for user
             user_notification = Notification(
                 user_id=user.id,
                 title='Artisan Registration Submitted',
-                message='Your artisan registration is pending admin verification.',
-                notification_type='upgrade_pending'
+                message='Your artisan registration is pending admin and KYC verification. Please upload required documents when prompted.',
+                notification_type='upgrade_pending_kyc'
             )
             db.session.add(user_notification)
+            
+            # 6. Create verification request for admin dashboard
+            verification_data = {
+                'category': artisan_profile.category,
+                'skills': artisan_profile.skills,
+                'experience_years': artisan_profile.experience_years,
+                'nin': artisan_profile.nin,
+                'state_of_origin': artisan_profile.state_of_origin,
+                'lga_of_origin': artisan_profile.lga_of_origin,
+                'bank_name': artisan_profile.bank_name,
+                'account_name': artisan_profile.account_name,
+                'account_number': artisan_profile.account_number
+            }
+            
+            verification_request = VerificationRequest(
+                user_id=user.id,
+                status='pending',
+                request_data=json.dumps(verification_data),
+                admin_notes=f'Upgraded from customer to artisan. KYC status: {artisan_profile.kyc_status}'
+            )
+            db.session.add(verification_request)
             
             db.session.commit()
             
             if request.is_json:
                 return jsonify({
                     'message': 'Artisan registration submitted for verification',
-                    'user': user.to_dict()
+                    'kyc_required': True,
+                    'user': user.to_dict(),
+                    'artisan_profile': artisan_profile.to_dict()
                 }), 200
             else:
-                flash('Artisan registration submitted for verification!', 'success')
+                flash('Artisan registration submitted for verification! KYC documents may be required.', 'success')
                 return redirect(url_for('user_bp.dashboard'))
                 
         except Exception as e:
             db.session.rollback()
+            current_app.logger.error(f"Error upgrading to artisan: {str(e)}", exc_info=True)
+            
             if request.is_json:
                 return jsonify({'error': str(e)}), 500
             else:
@@ -231,7 +316,7 @@ def upgrade_to_artisan():
                 return render_template('auth/upgrade_to_artisan.html',
                                       categories=service_categories,
                                       user=user)
-            
+                        
 # Service Request Routes
 @user_bp.route('/dashboard')
 @login_required

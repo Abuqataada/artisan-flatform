@@ -1,4 +1,4 @@
-# models.py - COMPLETELY FIXED VERSION
+# models.py - CORRECTED VERSION
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
@@ -32,12 +32,9 @@ class User(UserMixin, db.Model):
     address = db.Column(db.Text)
     profile_image = db.Column(db.String(255))
     
-    # Profile relationships (one-to-one)
-    artisan_profile = db.relationship('ArtisanProfile', backref='user', uselist=False, lazy=True)
-    admin_profile = db.relationship('AdminProfile', backref='user', uselist=False, lazy=True)
-    
-    # Relationships are now handled in individual models with explicit foreign_keys
-    # No ambiguous relationships here
+    # Profile relationships with explicit foreign_keys
+    artisan_profile = db.relationship('ArtisanProfile', backref='user', uselist=False, lazy=True, foreign_keys='ArtisanProfile.user_id')
+    admin_profile = db.relationship('AdminProfile', backref='user', uselist=False, lazy=True, foreign_keys='AdminProfile.user_id')
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -102,8 +99,37 @@ class ArtisanProfile(db.Model):
     pending_balance = db.Column(db.Float, default=0.0)
     available_balance = db.Column(db.Float, default=0.0)
     
+    # KYC Verification Fields
+    nin = db.Column(db.String(50), unique=True)  # National Identification Number
+    kyc_status = db.Column(db.String(20), default='pending')  # pending, submitted, verified, rejected
+    kyc_submitted_at = db.Column(db.DateTime(timezone=True))
+    kyc_verified_at = db.Column(db.DateTime(timezone=True))
+    kyc_verified_by = db.Column(db.String(36), db.ForeignKey('users.id'))
+    
+    # KYC Document URLs
+    nin_front_image = db.Column(db.String(255))
+    nin_back_image = db.Column(db.String(255))
+    passport_photo = db.Column(db.String(255))
+    proof_of_address = db.Column(db.String(255))
+    other_verification_docs = db.Column(db.Text)  # JSON array of additional docs
+    
+    # Additional personal info for KYC
+    date_of_birth = db.Column(db.Date)
+    nationality = db.Column(db.String(50), default='Nigerian')
+    state_of_origin = db.Column(db.String(100))
+    lga_of_origin = db.Column(db.String(100))
+    
+    # Bank Account Details
+    bank_name = db.Column(db.String(100))
+    account_name = db.Column(db.String(100))
+    account_number = db.Column(db.String(20))
+    bank_code = db.Column(db.String(10))
+    
+    # Relationship for KYC verifier
+    kyc_verifier = db.relationship('User', foreign_keys=[kyc_verified_by], backref='verified_artisans_kyc')
+    
     def to_dict(self):
-        return {
+        base_dict = {
             'category': self.category,
             'skills': self.skills,
             'experience_years': self.experience_years,
@@ -113,7 +139,101 @@ class ArtisanProfile(db.Model):
             'completed_jobs': self.completed_jobs,
             'hourly_rate': self.hourly_rate,
             'total_earnings': self.total_earnings,
-            'available_balance': self.available_balance
+            'available_balance': self.available_balance,
+            
+            # KYC Information
+            'nin': self.nin,
+            'kyc_status': self.kyc_status,
+            'kyc_submitted_at': self.kyc_submitted_at.isoformat() if self.kyc_submitted_at else None,
+            'kyc_verified_at': self.kyc_verified_at.isoformat() if self.kyc_verified_at else None,
+            'is_kyc_verified': self.kyc_status == 'verified',
+            
+            # Bank Information
+            'bank_name': self.bank_name,
+            'account_name': self.account_name,
+            'account_number': self.account_number,
+            
+            # Personal Information
+            'date_of_birth': self.date_of_birth.isoformat() if self.date_of_birth else None,
+            'nationality': self.nationality,
+            'state_of_origin': self.state_of_origin,
+            'lga_of_origin': self.lga_of_origin
+        }
+        
+        return base_dict
+
+class ArtisanKYCVerification(db.Model):
+    """Artisan KYC Verification Requests"""
+    __tablename__ = 'artisan_kyc_verifications'
+    
+    id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
+    artisan_profile_id = db.Column(db.String(36), db.ForeignKey('artisan_profiles.id'), nullable=False)
+    
+    # Personal Information from submission
+    nin = db.Column(db.String(50), nullable=False)
+    date_of_birth = db.Column(db.Date)
+    nationality = db.Column(db.String(50), default='Nigerian')
+    state_of_origin = db.Column(db.String(100))
+    lga_of_origin = db.Column(db.String(100))
+    
+    # Document URLs
+    nin_front_image = db.Column(db.String(255), nullable=False)
+    nin_back_image = db.Column(db.String(255))
+    passport_photo = db.Column(db.String(255), nullable=False)
+    proof_of_address = db.Column(db.String(255), nullable=False)
+    other_documents = db.Column(db.Text)  # JSON array of additional docs
+    
+    # Bank Information (for payment verification)
+    bank_name = db.Column(db.String(100))
+    account_name = db.Column(db.String(100))
+    account_number = db.Column(db.String(20))
+    bank_code = db.Column(db.String(10))
+    
+    # Verification Status
+    status = db.Column(db.String(20), default='pending')  # pending, reviewing, verified, rejected
+    rejection_reason = db.Column(db.Text)
+    
+    # Reviewer Information
+    reviewed_by = db.Column(db.String(36), db.ForeignKey('users.id'))
+    reviewed_at = db.Column(db.DateTime(timezone=True))
+    review_notes = db.Column(db.Text)
+    
+    # Metadata
+    created_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    
+    # Relationships
+    artisan_profile = db.relationship('ArtisanProfile', foreign_keys=[artisan_profile_id], backref='kyc_submissions', lazy=True)
+    reviewer = db.relationship('User', foreign_keys=[reviewed_by], backref='reviewed_artisan_kycs', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'artisan_profile_id': self.artisan_profile_id,
+            'artisan_name': self.artisan_profile.user.full_name if self.artisan_profile and self.artisan_profile.user else None,
+            'nin': self.nin,
+            'date_of_birth': self.date_of_birth.isoformat() if self.date_of_birth else None,
+            'nationality': self.nationality,
+            'state_of_origin': self.state_of_origin,
+            'lga_of_origin': self.lga_of_origin,
+            'status': self.status,
+            'rejection_reason': self.rejection_reason,
+            'reviewed_by': self.reviewed_by,
+            'reviewed_at': self.reviewed_at.isoformat() if self.reviewed_at else None,
+            'review_notes': self.review_notes,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            
+            # Document URLs
+            'nin_front_image': self.nin_front_image,
+            'nin_back_image': self.nin_back_image,
+            'passport_photo': self.passport_photo,
+            'proof_of_address': self.proof_of_address,
+            'other_documents': json.loads(self.other_documents) if self.other_documents else [],
+            
+            # Bank Information
+            'bank_name': self.bank_name,
+            'account_name': self.account_name,
+            'account_number': self.account_number
         }
 
 class AdminProfile(db.Model):
@@ -156,7 +276,6 @@ class ServiceCategory(db.Model):
             'is_active': self.is_active
         }
 
-# In models.py, update the ServiceRequest model
 class ServiceRequest(db.Model):
     """Service Request Model"""
     __tablename__ = 'service_requests'
@@ -178,7 +297,7 @@ class ServiceRequest(db.Model):
     price_estimate = db.Column(db.Float)
     actual_price = db.Column(db.Float)
     
-    # Other fields remain the same
+    # Other fields
     admin_notes = db.Column(db.Text)
     rating = db.Column(db.Integer)
     feedback = db.Column(db.Text)
@@ -192,17 +311,14 @@ class ServiceRequest(db.Model):
     
     @property
     def category(self):
-        """Property to get category (for backward compatibility)"""
         return self.category_obj
     
     @property
     def category_name(self):
-        """Property to get category name"""
         return self.category_obj.name if self.category_obj else None
     
     @property
     def category_icon(self):
-        """Property to get category icon"""
         return self.category_obj.icon if self.category_obj else 'tools'
     
     def to_dict(self):
@@ -224,7 +340,7 @@ class ServiceRequest(db.Model):
             'artisan_name': self.assigned_artisan.full_name if self.assigned_artisan else None,
             'artisan_id': self.artisan_id
         }
-    
+
 class Notification(db.Model):
     """Notification System Model"""
     __tablename__ = 'notifications'
@@ -238,7 +354,7 @@ class Notification(db.Model):
     related_id = db.Column(db.String(36))
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc))
     
-    # Relationship with explicit foreign_key
+    # Relationship
     user = db.relationship('User', foreign_keys=[user_id], backref='user_notifications', lazy=True)
     
     def to_dict(self):
@@ -263,7 +379,7 @@ class AccountDeactivation(db.Model):
     reactivated_at = db.Column(db.DateTime(timezone=True), nullable=True)
     is_permanent = db.Column(db.Boolean, default=False)
     
-    # Relationship with explicit foreign_key
+    # Relationship
     user = db.relationship('User', foreign_keys=[user_id], backref='user_deactivations', lazy=True)
     
     def to_dict(self):
@@ -290,7 +406,7 @@ class VerificationRequest(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
 
-    # Relationships with explicit foreign_keys
+    # Relationships
     user = db.relationship('User', foreign_keys=[user_id], backref='user_verifications', lazy=True)
     reviewer = db.relationship('User', foreign_keys=[reviewed_by], backref='reviewed_verifications', lazy=True)
     
@@ -317,7 +433,7 @@ class UserSettings(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
 
-    # Relationship with explicit foreign_key
+    # Relationship
     user = db.relationship('User', foreign_keys=[user_id], backref='user_settings_list', lazy=True)
 
     def to_dict(self):
@@ -328,11 +444,9 @@ class UserSettings(db.Model):
             'settings_data': json.loads(self.settings_data) if self.settings_data else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
-    
+
 class Withdrawal(db.Model):
-    """
-    Docstring for Withdrawal
-    """
+    """Withdrawal Model"""
     __tablename__ = 'withdrawals'
     
     id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
@@ -344,7 +458,7 @@ class Withdrawal(db.Model):
     requested_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc))
     processed_at = db.Column(db.DateTime(timezone=True))
     
-    # Relationship with explicit foreign_key
+    # Relationship
     artisan = db.relationship('User', foreign_keys=[artisan_id], backref='artisan_withdrawals', lazy=True)
     
     def to_dict(self):
@@ -357,11 +471,9 @@ class Withdrawal(db.Model):
             'requested_at': self.requested_at.isoformat() if self.requested_at else None,
             'processed_at': self.processed_at.isoformat() if self.processed_at else None
         }
-        
+
 class Review(db.Model):
-    """
-    Docstring for Review
-    """
+    """Review Model"""
     __tablename__ = 'reviews'
     
     id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
@@ -372,7 +484,7 @@ class Review(db.Model):
     comments = db.Column(db.Text)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc))
     
-    # Relationships with explicit foreign_keys
+    # Relationships
     service_request = db.relationship('ServiceRequest', foreign_keys=[service_request_id], backref='request_reviews', lazy=True)
     reviewer = db.relationship('User', foreign_keys=[reviewer_id], backref='given_reviews', lazy=True)
     reviewee = db.relationship('User', foreign_keys=[reviewee_id], backref='received_reviews', lazy=True)
@@ -387,8 +499,6 @@ class Review(db.Model):
             'comments': self.comments,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
-    
-# Update Payment model with unique backref name
 
 class Payment(db.Model):
     """Payment Model for service requests"""
@@ -433,10 +543,10 @@ class Payment(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
     
-    # FIXED: Changed backref name to be unique
-    service_request = db.relationship('ServiceRequest', backref='request_payments_master', lazy=True)
-    user = db.relationship('User', foreign_keys=[user_id], backref='user_payments_master', lazy=True)
-    verifier = db.relationship('User', foreign_keys=[verified_by], backref='verified_payments_master', lazy=True)
+    # Relationships
+    service_request = db.relationship('ServiceRequest', backref='request_payments', lazy=True)
+    user = db.relationship('User', foreign_keys=[user_id], backref='user_payments', lazy=True)
+    verifier = db.relationship('User', foreign_keys=[verified_by], backref='verified_payments', lazy=True)
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -477,12 +587,8 @@ class Payment(db.Model):
             'verified': self.verified_at is not None
         }
 
-# Update PaymentTransaction model with unique backref name
-
 class PaymentTransaction(db.Model):
-    """
-    Docstring for PaymentTransaction
-    """
+    """Payment Transaction Model"""
     __tablename__ = 'payment_transactions'
     
     id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
@@ -495,7 +601,7 @@ class PaymentTransaction(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
     
-    # FIXED: Changed backref names to be unique
+    # Relationships
     user = db.relationship('User', foreign_keys=[user_id], backref='user_transactions', lazy=True)
     service_request = db.relationship('ServiceRequest', foreign_keys=[service_request_id], backref='request_transactions', lazy=True)
     
@@ -510,5 +616,3 @@ class PaymentTransaction(db.Model):
             'transaction_reference': self.transaction_reference,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
-    
-

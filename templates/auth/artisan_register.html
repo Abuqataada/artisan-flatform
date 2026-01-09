@@ -81,6 +81,95 @@
                         <textarea class="form-control" id="address" name="address" rows="2" required 
                                 placeholder="Enter your physical address"></textarea>
                     </div>
+
+                    <div class="mb-4">
+                        <h5 class="border-bottom pb-2 mb-3">KYC Verification (Required for Artisans)</h5>
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>KYC Verification Required:</strong> All artisans must complete KYC verification to receive payments. 
+                            This helps us ensure the security and legitimacy of our platform.
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="nin" class="form-label">National Identification Number (NIN) *</label>
+                                <input type="text" class="form-control" id="nin" name="nin" 
+                                    placeholder="11-digit NIN number" pattern="\d{11}" required>
+                                <div class="form-text">Your 11-digit NIN (required for verification)</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="date_of_birth" class="form-label">Date of Birth *</label>
+                                <input type="date" class="form-control" id="date_of_birth" name="date_of_birth" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="state_of_origin" class="form-label">State of Origin *</label>
+                                <input type="text" class="form-control" id="state_of_origin" name="state_of_origin" 
+                                    placeholder="e.g., Lagos" required>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="lga_of_origin" class="form-label">Local Government Area (LGA) *</label>
+                                <input type="text" class="form-control" id="lga_of_origin" name="lga_of_origin" 
+                                    placeholder="Your LGA" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Add bank account details section -->
+                    <div class="mb-4">
+                        <h5 class="border-bottom pb-2 mb-3">Bank Account Details (For Payments)</h5>
+                        
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Important:</strong> Payments will be made to this bank account. Please ensure details are accurate.
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="bank_name" class="form-label">Bank Name *</label>
+                                <select class="form-select" id="bank_name" name="bank_name" required>
+                                    <option value="">Select Bank</option>
+                                    <option value="zenith">Zenith Bank</option>
+                                    <option value="gtb">GTBank</option>
+                                    <option value="access">Access Bank</option>
+                                    <option value="first">First Bank</option>
+                                    <option value="uba">UBA</option>
+                                    <option value="fidelity">Fidelity Bank</option>
+                                    <option value="stanbic">Stanbic IBTC</option>
+                                    <option value="union">Union Bank</option>
+                                    <option value="ecobank">Ecobank</option>
+                                    <option value="polaris">Polaris Bank</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3" id="other_bank_field" style="display: none;">
+                                <label for="other_bank_name" class="form-label">Other Bank Name</label>
+                                <input type="text" class="form-control" id="other_bank_name" name="other_bank_name">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="account_name" class="form-label">Account Name *</label>
+                                <input type="text" class="form-control" id="account_name" name="account_name" 
+                                    placeholder="As it appears on bank statement" required>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="account_number" class="form-label">Account Number *</label>
+                                <input type="text" class="form-control" id="account_number" name="account_number" 
+                                    placeholder="10-digit account number" pattern="\d{10}" required>
+                            </div>
+                        </div>
+                    </div>
+
+
                     
                     <!-- <div class="mb-3">
                         <label for="portfolio_images" class="form-label">Portfolio Images</label>
@@ -134,4 +223,69 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Show/hide other bank field
+    document.getElementById('bank_name').addEventListener('change', function() {
+        const otherBankField = document.getElementById('other_bank_field');
+        if (this.value === 'other') {
+            otherBankField.style.display = 'block';
+            document.getElementById('other_bank_name').required = true;
+        } else {
+            otherBankField.style.display = 'none';
+            document.getElementById('other_bank_name').required = false;
+        }
+    });
+    
+    // Validate NIN
+    document.getElementById('nin').addEventListener('input', function() {
+        const nin = this.value;
+        if (nin.length === 11 && /^\d+$/.test(nin)) {
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        } else {
+            this.classList.remove('is-valid');
+            if (nin.length > 0) {
+                this.classList.add('is-invalid');
+            }
+        }
+    });
+    
+    // Validate account number
+    document.getElementById('account_number').addEventListener('input', function() {
+        const accountNumber = this.value;
+        if (accountNumber.length === 10 && /^\d+$/.test(accountNumber)) {
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        } else {
+            this.classList.remove('is-valid');
+            if (accountNumber.length > 0) {
+                this.classList.add('is-invalid');
+            }
+        }
+    });
+    
+    // Validate date of birth (must be at least 18 years old)
+    document.getElementById('date_of_birth').addEventListener('change', function() {
+        const dob = new Date(this.value);
+        const today = new Date();
+        const age = today.getFullYear() - dob.getFullYear();
+        const monthDiff = today.getMonth() - dob.getMonth();
+        
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+            age--;
+        }
+        
+        if (age >= 18) {
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        } else {
+            this.classList.remove('is-valid');
+            this.classList.add('is-invalid');
+            alert('You must be at least 18 years old to register as an artisan.');
+        }
+    });
+</script>
 {% endblock %}

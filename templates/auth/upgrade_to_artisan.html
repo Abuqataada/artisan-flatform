@@ -3,66 +3,192 @@
 {% block content %}
 <div class="container mt-5">
     <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <h3>Become an Artisan</h3>
-                    <p class="mb-0">Complete your artisan profile</p>
+        <div class="col-md-10">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h3><i class="fas fa-tools me-2"></i>Become an Artisan</h3>
+                    <p class="mb-0">Complete your artisan profile to join our network of professionals</p>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-5">
                     <div class="alert alert-info">
                         <p><strong>Account Information:</strong></p>
-                        <p>Email: {{ user.email }}</p>
-                        <p>Name: {{ user.full_name }}</p>
-                        <p>Phone: {{ user.phone }}</p>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <strong>Email:</strong> {{ user.email }}
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Name:</strong> {{ user.full_name }}
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Phone:</strong> {{ user.phone }}
+                            </div>
+                        </div>
                     </div>
                     
                     <form method="POST" enctype="multipart/form-data">
-                        <div class="form-group">
-                            <label for="category">Service Category *</label>
-                            <select class="form-control" id="category" name="category" required>
-                                <option value="">Select a category</option>
-                                {% for category in categories %}
-                                <option value="{{ category.name }}">{{ category.name }}</option>
-                                {% endfor %}
-                            </select>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="category" class="form-label">Service Category *</label>
+                                <select class="form-select" id="category" name="category" required>
+                                    <option value="">Select a category</option>
+                                    {% for category in categories %}
+                                    <option value="{{ category.name }}">{{ category.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="experience_years" class="form-label">Years of Experience *</label>
+                                <input type="number" class="form-control" id="experience_years" 
+                                       name="experience_years" min="0" max="50" value="0" required>
+                            </div>
                         </div>
                         
-                        <div class="form-group">
-                            <label for="skills">Skills *</label>
+                        <div class="mb-3">
+                            <label for="skills" class="form-label">Skills & Specializations *</label>
                             <textarea class="form-control" id="skills" name="skills" 
                                       rows="3" placeholder="List your skills (comma-separated)" required></textarea>
                         </div>
                         
-                        <div class="form-group">
-                            <label for="experience_years">Years of Experience</label>
-                            <input type="number" class="form-control" id="experience_years" 
-                                   name="experience_years" min="0" max="50" value="0">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="credentials">Certifications/Credentials</label>
+                        <div class="mb-3">
+                            <label for="credentials" class="form-label">Certifications/Credentials</label>
                             <textarea class="form-control" id="credentials" name="credentials" 
                                       rows="2" placeholder="List your certifications (comma-separated)"></textarea>
                         </div>
                         
-                        <div class="form-group">
-                            <label for="portfolio_images">Portfolio Images</label>
+                        <div class="mb-3">
+                            <label for="address" class="form-label">Address *</label>
+                            <textarea class="form-control" id="address" name="address" 
+                                      rows="2" placeholder="Enter your physical address" required>{{ user.address if user.address else '' }}</textarea>
+                        </div>
+
+                        <!-- KYC Verification Section -->
+                        <div class="mb-4 border-top pt-4">
+                            <h5 class="border-bottom pb-2 mb-3">
+                                <i class="fas fa-id-card me-2"></i>KYC Verification (Required for Payments)
+                            </h5>
+                            
+                            <div class="alert alert-info mb-3">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>KYC Verification Required:</strong> All artisans must complete KYC verification to receive payments.
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="nin" class="form-label">National Identification Number (NIN) *</label>
+                                    <input type="text" class="form-control" id="nin" name="nin" 
+                                           placeholder="11-digit NIN number" pattern="\d{11}" required
+                                           value="{{ user.nin if user.nin else '' }}">
+                                    <div class="form-text">Your 11-digit NIN</div>
+                                </div>
+                                
+                                <div class="col-md-6 mb-3">
+                                    <label for="date_of_birth" class="form-label">Date of Birth *</label>
+                                    <input type="date" class="form-control" id="date_of_birth" name="date_of_birth" required>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="state_of_origin" class="form-label">State of Origin *</label>
+                                    <input type="text" class="form-control" id="state_of_origin" name="state_of_origin" 
+                                           placeholder="e.g., Lagos" required>
+                                </div>
+                                
+                                <div class="col-md-6 mb-3">
+                                    <label for="lga_of_origin" class="form-label">Local Government Area (LGA) *</label>
+                                    <input type="text" class="form-control" id="lga_of_origin" name="lga_of_origin" 
+                                           placeholder="Your LGA" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bank Account Details Section -->
+                        <div class="mb-4 border-top pt-4">
+                            <h5 class="border-bottom pb-2 mb-3">
+                                <i class="fas fa-university me-2"></i>Bank Account Details (For Payments)
+                            </h5>
+                            
+                            <div class="alert alert-warning mb-3">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Important:</strong> Payments will be made to this bank account. Please ensure details are accurate.
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="bank_name" class="form-label">Bank Name *</label>
+                                    <select class="form-select" id="bank_name" name="bank_name" required>
+                                        <option value="">Select Bank</option>
+                                        <option value="zenith">Zenith Bank</option>
+                                        <option value="gtb">GTBank</option>
+                                        <option value="access">Access Bank</option>
+                                        <option value="first">First Bank</option>
+                                        <option value="uba">UBA</option>
+                                        <option value="fidelity">Fidelity Bank</option>
+                                        <option value="stanbic">Stanbic IBTC</option>
+                                        <option value="union">Union Bank</option>
+                                        <option value="ecobank">Ecobank</option>
+                                        <option value="polaris">Polaris Bank</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-6 mb-3" id="other_bank_field" style="display: none;">
+                                    <label for="other_bank_name" class="form-label">Other Bank Name</label>
+                                    <input type="text" class="form-control" id="other_bank_name" name="other_bank_name">
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="account_name" class="form-label">Account Name *</label>
+                                    <input type="text" class="form-control" id="account_name" name="account_name" 
+                                           placeholder="As it appears on bank statement" required>
+                                </div>
+                                
+                                <div class="col-md-6 mb-3">
+                                    <label for="account_number" class="form-label">Account Number *</label>
+                                    <input type="text" class="form-control" id="account_number" name="account_number" 
+                                           placeholder="10-digit account number" pattern="\d{10}" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Portfolio Images (Optional) -->
+                        <div class="mb-3">
+                            <label for="portfolio_images" class="form-label">Portfolio Images (Optional)</label>
                             <input type="file" class="form-control-file" id="portfolio_images" 
                                    name="portfolio_images" multiple accept="image/*">
                             <small class="form-text text-muted">Upload images of your previous work</small>
                         </div>
-                        
-                        <div class="form-group form-check">
-                            <input type="checkbox" class="form-check-input" id="terms" required>
-                            <label class="form-check-label" for="terms">
-                                I agree to the <a href="">Terms of Service</a>
-                                and understand that my account requires verification
+
+                        <!-- Availability Checkbox -->
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="availability" name="availability" checked>
+                            <label class="form-check-label" for="availability">
+                                I am available for jobs immediately
                             </label>
                         </div>
                         
-                        <button type="submit" class="btn btn-primary btn-lg btn-block">
-                            Submit for Verification
+                        <!-- Terms Checkbox -->
+                        <div class="mb-4 form-check">
+                            <input type="checkbox" class="form-check-input" id="terms" required>
+                            <label class="form-check-label" for="terms">
+                                I agree to the <a href="#" class="text-decoration-none">Artisan Agreement</a>,
+                                <a href="#" class="text-decoration-none">Terms of Service</a>, and
+                                <a href="#" class="text-decoration-none">Privacy Policy</a>
+                            </label>
+                        </div>
+                        
+                        <!-- Verification Note -->
+                        <div class="alert alert-info mb-4">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Note:</strong> Your profile will be reviewed and verified by our admin team 
+                            before you can start receiving job assignments.
+                        </div>
+                        
+                        <button type="submit" class="btn btn-success btn-lg btn-block">
+                            <i class="fas fa-check-circle me-2"></i>Submit for Verification
                         </button>
                     </form>
                 </div>
@@ -70,4 +196,88 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Show/hide other bank field
+    document.getElementById('bank_name').addEventListener('change', function() {
+        const otherBankField = document.getElementById('other_bank_field');
+        if (this.value === 'other') {
+            otherBankField.style.display = 'block';
+            document.getElementById('other_bank_name').required = true;
+        } else {
+            otherBankField.style.display = 'none';
+            document.getElementById('other_bank_name').required = false;
+        }
+    });
+    
+    // Validate NIN
+    document.getElementById('nin').addEventListener('input', function() {
+        const nin = this.value;
+        if (nin.length === 11 && /^\d+$/.test(nin)) {
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        } else {
+            this.classList.remove('is-valid');
+            if (nin.length > 0) {
+                this.classList.add('is-invalid');
+            }
+        }
+    });
+    
+    // Validate account number
+    document.getElementById('account_number').addEventListener('input', function() {
+        const accountNumber = this.value;
+        if (accountNumber.length === 10 && /^\d+$/.test(accountNumber)) {
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        } else {
+            this.classList.remove('is-valid');
+            if (accountNumber.length > 0) {
+                this.classList.add('is-invalid');
+            }
+        }
+    });
+    
+    // Validate date of birth (must be at least 18 years old)
+    document.getElementById('date_of_birth').addEventListener('change', function() {
+        const dob = new Date(this.value);
+        const today = new Date();
+        let age = today.getFullYear() - dob.getFullYear();
+        const monthDiff = today.getMonth() - dob.getMonth();
+        
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+            age--;
+        }
+        
+        if (age >= 18) {
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        } else {
+            this.classList.remove('is-valid');
+            this.classList.add('is-invalid');
+            alert('You must be at least 18 years old to register as an artisan.');
+        }
+    });
+
+    // Password validation (if adding password change)
+    const password = document.getElementById('password');
+    const confirmPassword = document.getElementById('confirm_password');
+    
+    if (password && confirmPassword) {
+        function validatePassword() {
+            if (password.value !== confirmPassword.value) {
+                confirmPassword.classList.add('is-invalid');
+                confirmPassword.classList.remove('is-valid');
+            } else {
+                confirmPassword.classList.remove('is-invalid');
+                confirmPassword.classList.add('is-valid');
+            }
+        }
+        
+        password.addEventListener('input', validatePassword);
+        confirmPassword.addEventListener('input', validatePassword);
+    }
+</script>
 {% endblock %}
