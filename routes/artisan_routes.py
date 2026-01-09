@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from functools import wraps
-from models import db, User, ServiceRequest, ServiceCategory, Notification, ArtisanProfile, Withdrawal, PaymentTransaction, Review
+from models import db, User, ServiceRequest, ServiceCategory, Notification, ArtisanProfile, Withdrawal, PaymentTransaction, Review, AccountDeactivation, VerificationRequest
 import json
 import os
 from werkzeug.utils import secure_filename

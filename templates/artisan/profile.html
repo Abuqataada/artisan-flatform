@@ -246,12 +246,6 @@
                         {{ current_user.availability|title }}
                     </span>
                 </div>
-                <div class="rating-stars mb-2">
-                    {% for i in range(5) %}
-                    <i class="fas fa-star {{ 'text-warning' if i < (current_user.rating|round(0)|int) else 'text-light' }}"></i>
-                    {% endfor %}
-                    <span class="ms-2">({{ current_user.rating|round(1) if current_user.rating else '0.0' }})</span>
-                </div>
                 <button class="btn btn-light edit-button" data-bs-toggle="modal" data-bs-target="#editProfileModal">
                     <i class="fas fa-edit"></i>
                 </button>

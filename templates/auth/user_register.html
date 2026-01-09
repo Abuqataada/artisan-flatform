@@ -44,6 +44,21 @@
                                    placeholder="Enter your email" required>
                         </div>
                     </div>
+
+                    <div class="mb-3">
+                        <label for="nin" class="form-label">NIN *</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-id-card"></i></span>
+                            <input type="text" class="form-control" id="nin" name="nin" 
+                                placeholder="Enter your NIN (11 digits)" 
+                                pattern="\d{11}" 
+                                title="NIN must be exactly 11 numeric digits"
+                                maxlength="11"
+                                required>
+                        </div>
+                        <div class="form-text">NIN must be exactly 11 numeric digits</div>
+                        <div id="nin-error" class="text-danger small mt-1" style="display: none;"></div>
+                    </div>
                     
                     <div class="mb-3">
                         <label for="address" class="form-label">Address</label>
@@ -106,13 +121,49 @@
     </div>
 </div>
 
+
+<style>
+    .is-valid {
+        border-color: #198754 !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e") !important;
+        background-repeat: no-repeat;
+        background-position: right calc(.375em + .1875rem) center;
+        background-size: calc(.75em + .375rem) calc(.75em + .375rem);
+    }
+
+    .is-invalid {
+        border-color: #dc3545 !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e") !important;
+        background-repeat: no-repeat;
+        background-position: right calc(.375em + .1875rem) center;
+        background-size: calc(.75em + .375rem) calc(.75em + .375rem);
+    }
+</style>
+
 {% block scripts %}
 <script>
     // Password confirmation validation
     document.querySelector('form').addEventListener('submit', function(e) {
         const password = document.getElementById('password').value;
         const confirmPassword = document.getElementById('confirm_password').value;
+        const ninInput = document.getElementById('nin');
+        const ninError = document.getElementById('nin-error');
+        const nin = ninInput.value;
         
+        // Reset error display
+        ninError.style.display = 'none';
+        ninInput.classList.remove('is-invalid');
+        
+        // Validate NIN
+        if (!/^\d{11}$/.test(nin)) {
+            e.preventDefault();
+            ninInput.classList.add('is-invalid');
+            ninError.textContent = 'NIN must be exactly 11 numeric digits';
+            ninError.style.display = 'block';
+            return false;
+        }
+        
+        // Password validation
         if (password !== confirmPassword) {
             e.preventDefault();
             alert('Passwords do not match!');
@@ -123,6 +174,40 @@
             e.preventDefault();
             alert('Password must be at least 8 characters long!');
             return false;
+        }
+    });
+    
+    // Real-time NIN validation as user types
+    document.getElementById('nin').addEventListener('input', function(e) {
+        const ninInput = e.target;
+        const ninError = document.getElementById('nin-error');
+        const value = ninInput.value;
+        
+        // Remove any non-digit characters
+        const sanitized = value.replace(/\D/g, '');
+        
+        // Update the input value with only digits
+        if (value !== sanitized) {
+            ninInput.value = sanitized;
+        }
+        
+        // Limit to 11 digits
+        if (sanitized.length > 11) {
+            ninInput.value = sanitized.substring(0, 11);
+        }
+        
+        // Show/hide error message
+        if (sanitized.length > 0 && sanitized.length !== 11) {
+            ninInput.classList.add('is-invalid');
+            ninError.textContent = `NIN must be exactly 11 digits (currently ${sanitized.length})`;
+            ninError.style.display = 'block';
+        } else if (sanitized.length === 11) {
+            ninInput.classList.remove('is-invalid');
+            ninInput.classList.add('is-valid');
+            ninError.style.display = 'none';
+        } else {
+            ninInput.classList.remove('is-invalid', 'is-valid');
+            ninError.style.display = 'none';
         }
     });
 </script>

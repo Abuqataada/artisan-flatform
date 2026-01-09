@@ -22,6 +22,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     full_name = db.Column(db.String(100), nullable=False)
     user_type = db.Column(db.String(20), nullable=False)  # 'customer', 'artisan', 'admin'
+    nin = db.Column(db.String(50), unique=True)  # National Identification Number
     is_active = db.Column(db.Boolean, default=True)
     is_verified = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc))
@@ -155,37 +156,54 @@ class ServiceCategory(db.Model):
             'is_active': self.is_active
         }
 
+# In models.py, update the ServiceRequest model
 class ServiceRequest(db.Model):
     """Service Request Model"""
     __tablename__ = 'service_requests'
     
     id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
-    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)  # Client
-    artisan_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=True)  # Assigned artisan
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    artisan_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=True)
     category_id = db.Column(db.String(36), db.ForeignKey('service_categories.id'), nullable=False)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=False)
     location = db.Column(db.String(200), nullable=False)
     preferred_date = db.Column(db.Date)
     preferred_time = db.Column(db.String(50))
-    status = db.Column(db.String(20), default='pending')  # pending, assigned, in_progress, completed, cancelled
-    admin_notes = db.Column(db.Text)
+    status = db.Column(db.String(20), default='pending')
+    
+    # Payment preferences
+    payment_method = db.Column(db.String(50), default='cash')
+    payment_status = db.Column(db.String(20), default='pending')
     price_estimate = db.Column(db.Float)
     actual_price = db.Column(db.Float)
-    rating = db.Column(db.Integer)  # 1-5
+    
+    # Other fields remain the same
+    admin_notes = db.Column(db.Text)
+    rating = db.Column(db.Integer)
     feedback = db.Column(db.Text)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
     
-    # Relationships with explicit foreign_keys
+    # Relationships
     client = db.relationship('User', foreign_keys=[user_id], backref='client_requests', lazy=True)
     assigned_artisan = db.relationship('User', foreign_keys=[artisan_id], backref='assigned_requests', lazy=True)
     category_obj = db.relationship('ServiceCategory', backref='service_requests', lazy=True)
     
     @property
     def category(self):
-        """Property to get category name (for backward compatibility)"""
+        """Property to get category (for backward compatibility)"""
+        return self.category_obj
+    
+    @property
+    def category_name(self):
+        """Property to get category name"""
         return self.category_obj.name if self.category_obj else None
+    
+    @property
+    def category_icon(self):
+        """Property to get category icon"""
+        return self.category_obj.icon if self.category_obj else 'tools'
     
     def to_dict(self):
         return {
@@ -193,21 +211,20 @@ class ServiceRequest(db.Model):
             'title': self.title,
             'description': self.description,
             'status': self.status,
+            'payment_method': self.payment_method,
+            'payment_status': self.payment_status,
+            'price_estimate': self.price_estimate,
+            'actual_price': self.actual_price,
             'location': self.location,
             'preferred_date': self.preferred_date.isoformat() if self.preferred_date else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'category': self.category,
+            'category_name': self.category_name,
             'category_id': self.category_id,
+            'category_icon': self.category_icon,
             'artisan_name': self.assigned_artisan.full_name if self.assigned_artisan else None,
-            'artisan_id': self.artisan_id,
-            'client_name': self.client.full_name if self.client else None,
-            'client_id': self.user_id,
-            'price_estimate': self.price_estimate,
-            'actual_price': self.actual_price,
-            'rating': self.rating,
-            'feedback': self.feedback
+            'artisan_id': self.artisan_id
         }
-
+    
 class Notification(db.Model):
     """Notification System Model"""
     __tablename__ = 'notifications'
@@ -340,39 +357,7 @@ class Withdrawal(db.Model):
             'requested_at': self.requested_at.isoformat() if self.requested_at else None,
             'processed_at': self.processed_at.isoformat() if self.processed_at else None
         }
-    
-class PaymentTransaction(db.Model):
-    """
-    Docstring for PaymentTransaction
-    """
-    __tablename__ = 'payment_transactions'
-    
-    id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
-    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
-    service_request_id = db.Column(db.String(36), db.ForeignKey('service_requests.id'), nullable=False)
-    amount = db.Column(db.Float, nullable=False)
-    payment_method = db.Column(db.String(50), nullable=False)  # e.g., 'credit_card', 'banktransfer'
-    transaction_status = db.Column(db.String(20), default='pending')  # pending, completed, failed
-    transaction_reference = db.Column(db.String(100), unique=True)
-    created_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
-    
-    # Relationships with explicit foreign_keys
-    user = db.relationship('User', foreign_keys=[user_id], backref='user_payments', lazy=True)
-    service_request = db.relationship('ServiceRequest', foreign_keys=[service_request_id], backref='request_payments', lazy=True)
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'user_id': self.user_id,
-            'service_request_id': self.service_request_id,
-            'amount': self.amount,
-            'payment_method': self.payment_method,
-            'transaction_status': self.transaction_status,
-            'transaction_reference': self.transaction_reference,
-            'created_at': self.created_at.isoformat() if self.created_at else None
-        }
-    
+        
 class Review(db.Model):
     """
     Docstring for Review
@@ -402,3 +387,128 @@ class Review(db.Model):
             'comments': self.comments,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+    
+# Update Payment model with unique backref name
+
+class Payment(db.Model):
+    """Payment Model for service requests"""
+    __tablename__ = 'payments'
+    
+    id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
+    service_request_id = db.Column(db.String(36), db.ForeignKey('service_requests.id'), nullable=False)
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    
+    # Payment details
+    amount = db.Column(db.Float, nullable=False)
+    currency = db.Column(db.String(3), default='NGN')
+    payment_method = db.Column(db.String(50), nullable=False)
+    payment_status = db.Column(db.String(20), default='pending')
+    payment_type = db.Column(db.String(20), default='service_fee')
+    
+    # Company bank details
+    company_account_name = db.Column(db.String(100))
+    company_account_number = db.Column(db.String(20))
+    company_bank_name = db.Column(db.String(100))
+    
+    # User payment details
+    payer_account_name = db.Column(db.String(100))
+    payer_account_number = db.Column(db.String(20))
+    payer_bank_name = db.Column(db.String(100))
+    
+    # Receipt information
+    receipt_number = db.Column(db.String(50), unique=True)
+    receipt_image = db.Column(db.String(255))
+    transaction_reference = db.Column(db.String(100))
+    
+    # Dates
+    payment_date = db.Column(db.DateTime(timezone=True))
+    verified_at = db.Column(db.DateTime(timezone=True))
+    verified_by = db.Column(db.String(36), db.ForeignKey('users.id'))
+    
+    # Notes
+    admin_notes = db.Column(db.Text)
+    payment_notes = db.Column(db.Text)
+    
+    # Metadata
+    created_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    
+    # FIXED: Changed backref name to be unique
+    service_request = db.relationship('ServiceRequest', backref='request_payments_master', lazy=True)
+    user = db.relationship('User', foreign_keys=[user_id], backref='user_payments_master', lazy=True)
+    verifier = db.relationship('User', foreign_keys=[verified_by], backref='verified_payments_master', lazy=True)
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not self.receipt_number:
+            self.receipt_number = self.generate_receipt_number()
+    
+    def generate_receipt_number(self):
+        """Generate unique receipt number"""
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        random_part = str(uuid.uuid4().int)[:6]
+        return f'REC-{timestamp}-{random_part}'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'service_request_id': self.service_request_id,
+            'receipt_number': self.receipt_number,
+            'amount': self.amount,
+            'currency': self.currency,
+            'payment_method': self.payment_method,
+            'payment_status': self.payment_status,
+            'payment_type': self.payment_type,
+            'company_account_details': {
+                'account_name': self.company_account_name,
+                'account_number': self.company_account_number,
+                'bank_name': self.company_bank_name
+            } if self.company_account_name else None,
+            'payer_details': {
+                'account_name': self.payer_account_name,
+                'account_number': self.payer_account_number,
+                'bank_name': self.payer_bank_name
+            } if self.payer_account_name else None,
+            'receipt_image': self.receipt_image,
+            'transaction_reference': self.transaction_reference,
+            'payment_date': self.payment_date.isoformat() if self.payment_date else None,
+            'payment_notes': self.payment_notes,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'verified': self.verified_at is not None
+        }
+
+# Update PaymentTransaction model with unique backref name
+
+class PaymentTransaction(db.Model):
+    """
+    Docstring for PaymentTransaction
+    """
+    __tablename__ = 'payment_transactions'
+    
+    id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    service_request_id = db.Column(db.String(36), db.ForeignKey('service_requests.id'), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    payment_method = db.Column(db.String(50), nullable=False)
+    transaction_status = db.Column(db.String(20), default='pending')
+    transaction_reference = db.Column(db.String(100), unique=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    
+    # FIXED: Changed backref names to be unique
+    user = db.relationship('User', foreign_keys=[user_id], backref='user_transactions', lazy=True)
+    service_request = db.relationship('ServiceRequest', foreign_keys=[service_request_id], backref='request_transactions', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'service_request_id': self.service_request_id,
+            'amount': self.amount,
+            'payment_method': self.payment_method,
+            'transaction_status': self.transaction_status,
+            'transaction_reference': self.transaction_reference,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+    
+

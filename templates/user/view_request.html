@@ -36,6 +36,28 @@
         </div>
     </div>
 
+    <!-- Payment Alert (if payment is pending) -->
+    {% if request.payment_status == 'pending' and request.payment_method != 'cash' %}
+    <div class="alert alert-warning alert-dismissible fade show mb-4" role="alert">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="alert-heading mb-1"><i class="fas fa-exclamation-circle me-2"></i>Payment Required</h5>
+                <p class="mb-0">Your service request is pending payment. Please complete payment to proceed with service.</p>
+            </div>
+            <div>
+                {% if request.price_estimate or request.actual_price %}
+                <span class="badge bg-danger fs-6 me-3">
+                    ₦{{ (request.actual_price or request.price_estimate)|default(0)|number_format }}
+                </span>
+                {% endif %}
+                <a href="{{ url_for('user_bp.make_payment', request_id=request.id) }}" class="btn btn-warning">
+                    <i class="fas fa-credit-card me-2"></i>Make Payment Now
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Main Content -->
     <div class="row">
         <!-- Left Column - Request Details -->
@@ -44,22 +66,46 @@
             <div class="card mb-4">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Request Overview</h5>
-                    <span class="badge bg-{{ 
-                        'warning' if request.status == 'pending' 
-                        else 'info' if request.status == 'assigned' 
-                        else 'primary' if request.status == 'in_progress' 
-                        else 'success' if request.status == 'completed' 
-                        else 'danger' 
-                    }} p-2 fs-6">
-                        <i class="fas fa-{{ 
-                            'clock' if request.status == 'pending' 
-                            else 'user-check' if request.status == 'assigned' 
-                            else 'spinner' if request.status == 'in_progress' 
-                            else 'check-circle' if request.status == 'completed' 
-                            else 'times-circle' 
-                        }} me-1"></i>
-                        {{ request.status|replace('_', ' ')|title }}
-                    </span>
+                    <div>
+                        <span class="badge bg-{{ 
+                            'warning' if request.status == 'pending' 
+                            else 'info' if request.status == 'assigned' 
+                            else 'primary' if request.status == 'in_progress' 
+                            else 'success' if request.status == 'completed' 
+                            else 'danger' 
+                        }} p-2 fs-6 me-2">
+                            <i class="fas fa-{{ 
+                                'clock' if request.status == 'pending' 
+                                else 'user-check' if request.status == 'assigned' 
+                                else 'spinner' if request.status == 'in_progress' 
+                                else 'check-circle' if request.status == 'completed' 
+                                else 'times-circle' 
+                            }} me-1"></i>
+                            {{ request.status|replace('_', ' ')|title }}
+                        </span>
+                        
+                        <!-- Payment Status Badge -->
+                        <span class="badge bg-{{ 
+                            'warning' if request.payment_status == 'pending' 
+                            else 'success' if request.payment_status == 'paid' 
+                            else 'info' if request.payment_status == 'processing' 
+                            else 'secondary' if request.payment_status == 'cash' 
+                            else 'danger'
+                        }} p-2 fs-6">
+                            <i class="fas fa-{{ 
+                                'clock' if request.payment_status == 'pending' 
+                                else 'check-circle' if request.payment_status == 'paid' 
+                                else 'sync-alt' if request.payment_status == 'processing' 
+                                else 'money-bill-wave' if request.payment_status == 'cash' 
+                                else 'exclamation-circle'
+                            }} me-1"></i>
+                            {% if request.payment_method == 'cash' %}
+                                Cash Payment
+                            {% else %}
+                                {{ request.payment_status|title }}
+                            {% endif %}
+                        </span>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="row">
@@ -70,12 +116,12 @@
                                 </small>
                                 <div class="d-flex align-items-center">
                                     <div class="request-icon me-3">
-                                        <i class="fas fa-{{ request.category.icon|default('tools') }}"></i>
+                                        <i class="fas fa-{{ request.category_icon|default('tools') }}"></i>
                                     </div>
                                     <div>
-                                        <strong>{{ request.category.name }}</strong>
-                                        {% if request.category.description %}
-                                        <p class="text-muted small mb-0 mt-1">{{ request.category.description }}</p>
+                                        <strong>{{ request.category_name }}</strong>
+                                        {% if request.category_obj and request.category_obj.description %}
+                                        <p class="text-muted small mb-0 mt-1">{{ request.category_obj.description }}</p>
                                         {% endif %}
                                     </div>
                                 </div>
@@ -135,27 +181,78 @@
                                 </div>
                             </div>
                             
-                            {% if request.price_estimate or request.actual_price %}
+                            <!-- Payment Information Section -->
                             <div class="mb-4">
                                 <small class="text-muted d-block mb-1">
-                                    <i class="fas fa-money-bill-wave me-1"></i>Pricing
+                                    <i class="fas fa-credit-card me-1"></i>Payment Information
                                 </small>
                                 <div class="pricing-info">
-                                    {% if request.price_estimate %}
-                                    <div class="mb-2">
-                                        <span class="text-muted">Estimated Price:</span>
-                                        <strong class="d-block">₦{{ request.price_estimate|number_format }}</strong>
+                                    <div class="mb-3">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="text-muted">Method:</span>
+                                            <strong class="text-{{ 
+                                                'success' if request.payment_method == 'cash' 
+                                                else 'primary' if request.payment_method == 'bank_transfer' 
+                                                else 'info'
+                                            }}">
+                                                {{ request.payment_method|replace('_', ' ')|title }}
+                                            </strong>
+                                        </div>
+                                        
+                                        {% if request.price_estimate %}
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="text-muted">Estimated Price:</span>
+                                            <strong class="d-block">₦{{ request.price_estimate|number_format }}</strong>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if request.actual_price %}
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="text-muted">Actual Price:</span>
+                                            <strong class="d-block text-success">₦{{ request.actual_price|number_format }}</strong>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="text-muted">Status:</span>
+                                            <span class="badge bg-{{ 
+                                                'warning' if request.payment_status == 'pending' 
+                                                else 'success' if request.payment_status == 'paid' 
+                                                else 'info' if request.payment_status == 'processing' 
+                                                else 'secondary'
+                                            }}">
+                                                {{ request.payment_status|title }}
+                                            </span>
+                                        </div>
                                     </div>
-                                    {% endif %}
-                                    {% if request.actual_price %}
-                                    <div>
-                                        <span class="text-muted">Actual Price:</span>
-                                        <strong class="d-block text-success">₦{{ request.actual_price|number_format }}</strong>
+                                    
+                                    <!-- Payment CTA -->
+                                    {% if request.payment_status == 'pending' and request.payment_method != 'cash' %}
+                                    <div class="alert alert-warning p-3 mb-0">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <strong>Payment Required</strong>
+                                                <p class="small mb-0 mt-1">Complete payment to proceed</p>
+                                            </div>
+                                            <a href="{{ url_for('user_bp.make_payment', request_id=request.id) }}" 
+                                               class="btn btn-sm btn-warning">
+                                                <i class="fas fa-credit-card me-1"></i>Pay Now
+                                            </a>
+                                        </div>
+                                    </div>
+                                    {% elif request.payment_method == 'cash' %}
+                                    <div class="alert alert-info p-3 mb-0">
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-info-circle me-2"></i>
+                                            <div>
+                                                <strong>Cash Payment</strong>
+                                                <p class="small mb-0">Pay directly to artisan upon service completion</p>
+                                            </div>
+                                        </div>
                                     </div>
                                     {% endif %}
                                 </div>
                             </div>
-                            {% endif %}
                             
                             {% if request.admin_notes %}
                             <div class="mb-4">
@@ -193,6 +290,29 @@
                 </div>
                 <div class="card-body">
                     <div class="status-timeline">
+                        <!-- Payment Step (if applicable) -->
+                        {% if request.payment_method != 'cash' %}
+                        <div class="status-step {{ 'completed' if request.payment_status == 'paid' else 'current' if request.payment_status == 'pending' else '' }}">
+                            <div class="step-icon">
+                                <i class="fas fa-credit-card"></i>
+                            </div>
+                            <div class="step-content">
+                                <h6>Payment</h6>
+                                <p class="text-muted small mb-0">Complete payment for service</p>
+                                {% if request.payment_status == 'paid' %}
+                                <span class="text-success smaller">
+                                    <i class="fas fa-check-circle me-1"></i>Payment completed
+                                </span>
+                                {% elif request.payment_status == 'pending' %}
+                                <a href="{{ url_for('user_bp.make_payment', request_id=request.id) }}" 
+                                   class="btn btn-sm btn-warning mt-2">
+                                    <i class="fas fa-credit-card me-1"></i>Make Payment
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
                         <div class="status-step {{ 'completed' if request.status in ['assigned', 'in_progress', 'completed'] else 'current' if request.status == 'pending' else '' }}">
                             <div class="step-icon">
                                 <i class="fas fa-plus-circle"></i>
@@ -254,6 +374,73 @@
                 </div>
             </div>
             
+            <!-- Payment History (if any payments exist) -->
+            {% if request.payments %}
+            <div class="card mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Payment History</h5>
+                    <a href="{{ url_for('user_bp.payment_history') }}" class="btn btn-sm btn-outline-primary">
+                        View All Payments
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Receipt No.</th>
+                                    <th>Amount</th>
+                                    <th>Method</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in request.payments %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ payment.receipt_number }}</strong>
+                                    </td>
+                                    <td class="fw-bold">₦{{ payment.amount|number_format }}</td>
+                                    <td>
+                                        <span class="badge bg-secondary">
+                                            {{ payment.payment_method|replace('_', ' ')|title }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% set status_class = {
+                                            'pending': 'warning',
+                                            'processing': 'info',
+                                            'completed': 'success',
+                                            'failed': 'danger'
+                                        } %}
+                                        <span class="badge bg-{{ status_class.get(payment.payment_status, 'secondary') }}">
+                                            {{ payment.payment_status|title }}
+                                        </span>
+                                    </td>
+                                    <td>{{ payment.created_at.strftime('%b %d, %Y') }}</td>
+                                    <td>
+                                        <a href="{{ url_for('user_bp.view_payment', payment_id=payment.id) }}" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        {% if payment.payment_status == 'pending' and payment.payment_method == 'bank_transfer' %}
+                                        <a href="{{ url_for('user_bp.payment_confirmation', payment_id=payment.id) }}" 
+                                           class="btn btn-sm btn-outline-warning ms-1">
+                                            <i class="fas fa-upload"></i>
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
             <!-- Feedback Section (if completed) -->
             {% if request.status == 'completed' and request.rating %}
             <div class="card">
@@ -288,6 +475,54 @@
         
         <!-- Right Column - Artisan Info & Actions -->
         <div class="col-lg-4">
+            <!-- Payment Action Card (if payment is pending) -->
+            {% if request.payment_status == 'pending' and request.payment_method != 'cash' %}
+            <div class="card mb-4 border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-circle me-2"></i>Complete Payment</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <div class="payment-icon mb-3">
+                            <i class="fas fa-credit-card fa-3x text-warning"></i>
+                        </div>
+                        <h4 class="text-danger">
+                            ₦{{ (request.actual_price or request.price_estimate)|default(0)|number_format }}
+                        </h4>
+                        <p class="text-muted">Amount Due</p>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <p class="small mb-2">
+                            <i class="fas fa-info-circle me-1"></i>
+                            <strong>Payment Method:</strong> {{ request.payment_method|replace('_', ' ')|title }}
+                        </p>
+                        {% if request.payment_method == 'bank_transfer' %}
+                        <p class="small mb-0">
+                            <i class="fas fa-university me-1"></i>
+                            Bank transfer to our company account
+                        </p>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('user_bp.make_payment', request_id=request.id) }}" 
+                           class="btn btn-warning btn-lg">
+                            <i class="fas fa-credit-card me-2"></i>Make Payment Now
+                        </a>
+                        {% if request.payment_method == 'bank_transfer' %}
+                        <a href="#" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#bankDetailsModal">
+                            <i class="fas fa-university me-2"></i>View Bank Details
+                        </a>
+                        {% endif %}
+                        <a href="#" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#paymentHelpModal">
+                            <i class="fas fa-question-circle me-2"></i>Need Help?
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
             <!-- Assigned Artisan Card -->
             {% if request.artisan_id %}
             <div class="card mb-4">
@@ -300,15 +535,19 @@
                             <i class="fas fa-user fa-2x"></i>
                         </div>
                         <h5>{{ request.assigned_artisan.full_name }}</h5>
-                        <p class="text-muted small mb-2">{{ request.assigned_artisan.category }}</p>
+                        {% if request.assigned_artisan.artisan_profile %}
+                        <p class="text-muted small mb-2">{{ request.assigned_artisan.artisan_profile.category }}</p>
+                        {% endif %}
                         
                         <div class="rating-display mb-3">
                             <div class="stars">
-                                {% set rating = request.assigned_artisan.rating|int %}
+                                {% if request.assigned_artisan.artisan_profile %}
+                                {% set rating = request.assigned_artisan.artisan_profile.rating|int %}
                                 {% for i in range(1, 6) %}
                                 <i class="fas fa-star {{ 'text-warning' if i <= rating else 'text-muted' }}"></i>
                                 {% endfor %}
-                                <span class="ms-2">{{ request.assigned_artisan.rating|round(1) }}/5</span>
+                                <span class="ms-2">{{ request.assigned_artisan.artisan_profile.rating|round(1) }}/5</span>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -316,23 +555,27 @@
                     <div class="row">
                         <div class="col-6">
                             <div class="stat-card-small text-center">
-                                <div class="stat-number">{{ request.assigned_artisan.experience_years }}</div>
+                                {% if request.assigned_artisan.artisan_profile %}
+                                <div class="stat-number">{{ request.assigned_artisan.artisan_profile.experience_years }}</div>
+                                {% else %}
+                                <div class="stat-number">0</div>
+                                {% endif %}
                                 <div class="stat-label">Years Experience</div>
                             </div>
                         </div>
                         <div class="col-6">
                             <div class="stat-card-small text-center">
-                                <div class="stat-number">{{ request.assigned_artisan.is_verified|yesno('Verified,Not Verified') }}</div>
+                                <div class="stat-number">{{ 'Verified' if request.assigned_artisan.is_verified else 'Not Verified' }}</div>
                                 <div class="stat-label">Verification</div>
                             </div>
                         </div>
                     </div>
                     
-                    {% if request.assigned_artisan.skills %}
+                    {% if request.assigned_artisan.artisan_profile and request.assigned_artisan.artisan_profile.skills %}
                     <div class="mt-4">
                         <small class="text-muted d-block mb-2">Skills</small>
                         <div class="skills-list">
-                            {% set skills = request.assigned_artisan.skills.split(',') %}
+                            {% set skills = request.assigned_artisan.artisan_profile.skills.split(',') %}
                             {% for skill in skills[:5] %}
                             <span class="badge bg-light text-dark mb-1 me-1">{{ skill.strip() }}</span>
                             {% endfor %}
@@ -382,6 +625,14 @@
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2">
+                        <!-- Payment Action (if pending) -->
+                        {% if request.payment_status == 'pending' and request.payment_method != 'cash' %}
+                        <a href="{{ url_for('user_bp.make_payment', request_id=request.id) }}" 
+                           class="btn btn-warning">
+                            <i class="fas fa-credit-card me-2"></i>Complete Payment
+                        </a>
+                        {% endif %}
+                        
                         {% if request.status in ['pending', 'assigned'] %}
                         <button class="btn btn-outline-danger" id="cancelRequestBtnBottom">
                             <i class="fas fa-times me-2"></i>Cancel Request
@@ -409,6 +660,54 @@
                 </div>
             </div>
             
+            <!-- Payment Information Summary -->
+            <div class="card mt-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>Payment Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">Payment Method:</span>
+                            <strong>{{ request.payment_method|replace('_', ' ')|title }}</strong>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">Status:</span>
+                            <span class="badge bg-{{ 
+                                'warning' if request.payment_status == 'pending' 
+                                else 'success' if request.payment_status == 'paid' 
+                                else 'info' if request.payment_status == 'processing' 
+                                else 'secondary'
+                            }}">
+                                {{ request.payment_status|title }}
+                            </span>
+                        </div>
+                        
+                        {% if request.price_estimate %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">Estimate:</span>
+                            <strong>₦{{ request.price_estimate|number_format }}</strong>
+                        </div>
+                        {% endif %}
+                        
+                        {% if request.actual_price %}
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Final Price:</span>
+                            <strong class="text-success">₦{{ request.actual_price|number_format }}</strong>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    {% if request.payment_status == 'pending' and request.payment_method != 'cash' %}
+                    <div class="alert alert-warning small p-2 mb-0">
+                        <i class="fas fa-exclamation-circle me-1"></i>
+                        Payment required to proceed with service
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
             <!-- Help Card -->
             <div class="card mt-4">
                 <div class="card-header bg-white">
@@ -433,6 +732,73 @@
                         </li>
                     </ul>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bank Details Modal -->
+<div class="modal fade" id="bankDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-university me-2"></i>Company Bank Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-success">
+                    <h6><i class="fas fa-info-circle me-2"></i>Important Information</h6>
+                    <p class="small mb-2">Use the details below for bank transfer:</p>
+                </div>
+                
+                <div class="card border-success">
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">Account Name</label>
+                            <div class="bank-detail-value">
+                                <strong>Uwaila.com globals</strong>
+                                <button class="btn btn-sm btn-outline-primary ms-2 copy-btn" data-text="Uwaila.com globals">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">Account Number</label>
+                            <div class="bank-detail-value">
+                                <strong>1217754667</strong>
+                                <button class="btn btn-sm btn-outline-primary ms-2 copy-btn" data-text="1217754667">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">Bank Name</label>
+                            <div class="bank-detail-value">
+                                <strong>Zenith Bank</strong>
+                                <button class="btn btn-sm btn-outline-primary ms-2 copy-btn" data-text="Zenith Bank">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-warning mt-3">
+                    <h6><i class="fas fa-exclamation-triangle me-2"></i>Important Notes</h6>
+                    <ul class="mb-0">
+                        <li class="small">Use your Request ID <code>{{ request.id[:8] }}...</code> as payment reference</li>
+                        <li class="small">Upload payment receipt after transfer</li>
+                        <li class="small">Allow 24-48 hours for payment verification</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a href="{{ url_for('user_bp.make_payment', request_id=request.id) }}" class="btn btn-primary">
+                    <i class="fas fa-credit-card me-1"></i>Proceed to Payment
+                </a>
             </div>
         </div>
     </div>
@@ -508,6 +874,75 @@
                     <button type="submit" class="btn btn-danger">Confirm Cancellation</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Help Modal -->
+<div class="modal fade" id="paymentHelpModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-question-circle me-2"></i>Payment Help</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="accordion" id="paymentHelpAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#helpBankTransfer">
+                                How to make bank transfer?
+                            </button>
+                        </h2>
+                        <div id="helpBankTransfer" class="accordion-collapse collapse show" data-bs-parent="#paymentHelpAccordion">
+                            <div class="accordion-body">
+                                <ol class="mb-0">
+                                    <li>Transfer the amount to our company account</li>
+                                    <li>Use your Request ID as payment reference</li>
+                                    <li>Upload the payment receipt after transfer</li>
+                                    <li>Wait for verification (24-48 hours)</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#helpCashPayment">
+                                Cash Payment Information
+                            </button>
+                        </h2>
+                        <div id="helpCashPayment" class="accordion-collapse collapse" data-bs-parent="#paymentHelpAccordion">
+                            <div class="accordion-body">
+                                <p>For cash payments, pay directly to the artisan when they complete the service.</p>
+                                <p class="mb-0">The artisan will confirm receipt and update payment status.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#helpContact">
+                                Need more help?
+                            </button>
+                        </h2>
+                        <div id="helpContact" class="accordion-collapse collapse" data-bs-parent="#paymentHelpAccordion">
+                            <div class="accordion-body">
+                                <p><strong>Contact Support:</strong></p>
+                                <ul class="mb-0">
+                                    <li>Phone: 0800-UWAILA</li>
+                                    <li>Email: payments@uwaila.com</li>
+                                    <li>Hours: Mon-Fri, 9AM-6PM</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a href="tel:0800UWAILA" class="btn btn-primary">
+                    <i class="fas fa-phone me-1"></i>Call Support
+                </a>
+            </div>
         </div>
     </div>
 </div>
@@ -673,6 +1108,27 @@
         font-size: 0.85rem;
     }
     
+    .payment-icon {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: rgba(255, 193, 7, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+    }
+    
+    .bank-detail-value {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 5px;
+        border: 1px solid #dee2e6;
+    }
+    
     @keyframes pulse {
         0% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0.4); }
         70% { box-shadow: 0 0 0 10px rgba(13, 110, 253, 0); }
@@ -681,7 +1137,8 @@
     
     @media print {
         .breadcrumb, .btn-group, .card-header .badge, .status-timeline::before, 
-        .timeline::before, .avatar-circle-lg, .card:last-child, .modal {
+        .timeline::before, .avatar-circle-lg, .card:last-child, .modal,
+        .alert, .btn {
             display: none !important;
         }
         
@@ -864,13 +1321,37 @@
             });
         }
         
-        // Auto-refresh status if request is in progress
-        {% if request.status in ['pending', 'assigned', 'in_progress'] %}
+        // Copy to clipboard functionality for bank details
+        const copyButtons = document.querySelectorAll('.copy-btn');
+        copyButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                const text = this.getAttribute('data-text');
+                
+                navigator.clipboard.writeText(text).then(() => {
+                    const originalHTML = this.innerHTML;
+                    this.innerHTML = '<i class="fas fa-check"></i>';
+                    this.classList.remove('btn-outline-primary');
+                    this.classList.add('btn-outline-success');
+                    
+                    setTimeout(() => {
+                        this.innerHTML = originalHTML;
+                        this.classList.remove('btn-outline-success');
+                        this.classList.add('btn-outline-primary');
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy: ', err);
+                });
+            });
+        });
+        
+        // Auto-refresh status if request is in progress or payment is pending
+        {% if request.status in ['pending', 'assigned', 'in_progress'] or request.payment_status == 'pending' %}
         setInterval(function() {
             fetch('{{ url_for("user_bp.get_service_request", request_id=request.id) }}')
                 .then(response => response.json())
                 .then(data => {
-                    if (data.status !== '{{ request.status }}') {
+                    if (data.status !== '{{ request.status }}' || data.payment_status !== '{{ request.payment_status }}') {
                         // If status changed, reload the page
                         location.reload();
                     }
@@ -881,13 +1362,13 @@
         
         // Print functionality
         window.addEventListener('beforeprint', function() {
-            document.querySelectorAll('.btn, .modal, .dropdown').forEach(el => {
+            document.querySelectorAll('.btn, .modal, .dropdown, .alert').forEach(el => {
                 el.classList.add('d-none');
             });
         });
         
         window.addEventListener('afterprint', function() {
-            document.querySelectorAll('.btn, .modal, .dropdown').forEach(el => {
+            document.querySelectorAll('.btn, .modal, .dropdown, .alert').forEach(el => {
                 el.classList.remove('d-none');
             });
         });

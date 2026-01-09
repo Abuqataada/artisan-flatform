@@ -5,10 +5,10 @@ import os
 from werkzeug.utils import secure_filename
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash
-from models import db, User, ServiceRequest, ServiceCategory, Notification, ArtisanProfile
-from datetime import datetime
+from models import db, User, ServiceRequest, ServiceCategory, Notification, ArtisanProfile, ServiceRequest, Payment
+from datetime import datetime, timedelta, timezone
 import json
-from forms import LoginForm, UserRegistrationForm
+from forms import LoginForm, UserRegistrationForm, ServiceRequestForm, BankAccountForm, ArtisanRegistrationForm, ServiceRequestForm, PaymentForm
 
 user_bp = Blueprint('user_bp', __name__)
 
@@ -41,6 +41,7 @@ def register():
             email=data['email'],
             phone=data['phone'],
             full_name=data['full_name'],
+            nin=data.get('nin', ''),  # CRITICAL: Store NIN
             address=data.get('address', ''),
             user_type='customer'  # CRITICAL: Set user_type
         )
@@ -325,6 +326,7 @@ def completed_requests():
 def my_requests():
     """View all user requests"""
     all_requests = ServiceRequest.query.filter_by(user_id=current_user.id)\
+        .join(ServiceCategory, ServiceRequest.category_id == ServiceCategory.id)\
         .order_by(ServiceRequest.created_at.desc()).all()
     
     return render_template('user/my_requests.html', requests=all_requests)
@@ -360,49 +362,84 @@ def create_service_request():
         flash('User access required', 'danger')
         return redirect(url_for('user_bp.dashboard'))
     
+    form = ServiceRequestForm()
+    
+    # Populate category choices
+    categories = ServiceCategory.query.filter_by(is_active=True).all()
+    form.category_id.choices = [(cat.id, cat.name) for cat in categories] + [('', 'Select category')]
+    
     if request.method == 'GET':
-        categories = ServiceCategory.query.filter_by(is_active=True).all()
         return render_template('user/create_request.html', 
+                              form=form,
                               categories=categories,
                               today=datetime.now().date())
     
     elif request.method == 'POST':
-        data = request.form if request.form else request.get_json()
-        
-        service_request = ServiceRequest(
-            user_id=current_user.id,
-            category_id=data['category_id'],
-            title=data['title'],
-            description=data['description'],
-            location=data['location'],
-            preferred_date=datetime.strptime(data['preferred_date'], '%Y-%m-%d') if data.get('preferred_date') else None,
-            preferred_time=data.get('preferred_time'),
-            status='pending'
-        )
-        
-        db.session.add(service_request)
-        db.session.commit()
-        
-        # Create notification for admin
-        notification = Notification(
-            user_id='admin',  # Will be handled by admin notification system
-            user_type='admin',
-            title='New Service Request',
-            message=f'New service request from {current_user.full_name}: {service_request.title}',
-            notification_type='new_request',
-            related_id=service_request.id
-        )
-        db.session.add(notification)
-        db.session.commit()
-        
-        if request.is_json:
-            return jsonify({
-                'message': 'Service request submitted successfully',
-                'request': service_request.to_dict()
-            }), 201
-        else:
+        if form.validate_on_submit():
+            # Get payment method from form data (it's not in the WTForm)
+            payment_method = request.form.get('payment_method', 'cash')
+            
+            # Create service request
+            service_request = ServiceRequest(
+                user_id=current_user.id,
+                category_id=form.category_id.data,
+                title=form.title.data,
+                description=form.description.data,
+                location=form.location.data,
+                preferred_date=form.preferred_date.data,
+                preferred_time=form.preferred_time.data,
+                status='pending',
+                payment_method=payment_method,
+                payment_status='pending'
+            )
+            
+            # Handle additional notes
+            if form.additional_notes.data:
+                service_request.description += f"\n\nAdditional Notes: {form.additional_notes.data}"
+            
+            db.session.add(service_request)
+            db.session.commit()
+            
+            # Create notifications
+            notification = Notification(
+                user_id='admin',
+                title='New Service Request',
+                message=f'New service request from {current_user.full_name}: {service_request.title}',
+                notification_type='new_request',
+                related_id=service_request.id
+            )
+            db.session.add(notification)
+            
+            user_notification = Notification(
+                user_id=current_user.id,
+                title='Service Request Submitted',
+                message=f'Your service request "{service_request.title}" has been submitted.',
+                notification_type='request_submitted',
+                related_id=service_request.id
+            )
+            db.session.add(user_notification)
+            
+            db.session.commit()
+            
             flash('Service request submitted successfully!', 'success')
-            return redirect(url_for('user_bp.dashboard'))
+            
+            # Redirect based on payment method
+            if service_request.payment_method == 'bank_transfer':
+                return redirect(url_for('user_bp.make_payment', request_id=service_request.id))
+            else:
+                return redirect(url_for('user_bp.dashboard'))
+        else:
+            # Flash form errors
+            for field, errors in form.errors.items():
+                for error in errors:
+                    flash(f"{getattr(form, field).label.text}: {error}", 'danger')
+            return redirect(url_for('user_bp.create_service_request'))
+        
+def flash_form_errors(form):
+    """Flash all form errors"""
+    for field, errors in form.errors.items():
+        for error in errors:
+            flash(f"{getattr(form, field).label.text}: {error}", 'danger')
 
 @user_bp.route('/service-request/<request_id>', methods=['GET'])
 @login_required
@@ -755,4 +792,255 @@ def delete_account():
     return jsonify({'message': 'Account deleted successfully'})
 
 
+# Company bank details (store securely in production)
+COMPANY_BANK_DETAILS = {
+    'account_name': 'Uwaila.com globals',
+    'account_number': '1217754667',
+    'bank_name': 'Zenith Bank'
+}
 
+@user_bp.route('/profile/bank-details', methods=['GET', 'POST'])
+@login_required
+def manage_bank_details():
+    """Manage user bank account details"""
+    form = BankAccountForm()
+    
+    if form.validate_on_submit():
+        try:
+            current_user.bank_name = form.other_bank_name.data if form.bank_name.data == 'other' else form.bank_name.data
+            current_user.account_name = form.account_name.data
+            current_user.account_number = form.account_number.data
+            
+            db.session.commit()
+            flash('Bank details updated successfully!', 'success')
+            return redirect(url_for('user_bp.profile'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating bank details: {str(e)}', 'danger')
+    
+    # Pre-populate form
+    if current_user.bank_name:
+        form.bank_name.data = current_user.bank_name
+        form.account_name.data = current_user.account_name
+        form.account_number.data = current_user.account_number
+    
+    return render_template('user/bank_details.html', form=form)
+
+@user_bp.route('/payment/<request_id>', methods=['GET', 'POST'])
+@login_required
+def make_payment(request_id):
+    """Make payment for a service request"""
+    service_request = ServiceRequest.query.get_or_404(request_id)
+    
+    # Check if user owns this request
+    if service_request.user_id != current_user.id:
+        flash('Unauthorized access', 'danger')
+        return redirect(url_for('user_bp.dashboard'))
+    
+    # Check if payment already exists
+    existing_payment = Payment.query.filter_by(
+        service_request_id=request_id,
+        user_id=current_user.id
+    ).first()
+    
+    if existing_payment and existing_payment.payment_status == 'completed':
+        flash('Payment already completed for this request', 'info')
+        return redirect(url_for('user_bp.view_request', request_id=request_id))
+    
+    form = PaymentForm()
+    amount = service_request.price_estimate or service_request.actual_price or 0
+    
+    if form.validate_on_submit():
+        try:
+            # Handle Paystack - show coming soon message
+            if form.payment_method.data == 'paystack':
+                flash('Paystack integration is coming soon! Please use another payment method.', 'info')
+                return redirect(url_for('user_bp.make_payment', request_id=request_id))
+            
+            # Validate amount
+            if float(form.amount.data) <= 0:
+                flash('Amount must be greater than 0', 'danger')
+                return render_template('user/make_payment.html',
+                                     form=form,
+                                     request=service_request,
+                                     company_details=COMPANY_BANK_DETAILS)
+            
+            # Create payment record
+            payment = Payment(
+                service_request_id=request_id,
+                user_id=current_user.id,
+                amount=float(form.amount.data),
+                payment_method=form.payment_method.data,
+                payment_type='service_fee',
+                payment_status='pending' if form.payment_method.data == 'bank_transfer' else 'completed',
+                company_account_name=COMPANY_BANK_DETAILS['account_name'] if form.payment_method.data == 'bank_transfer' else None,
+                company_account_number=COMPANY_BANK_DETAILS['account_number'] if form.payment_method.data == 'bank_transfer' else None,
+                company_bank_name=COMPANY_BANK_DETAILS['bank_name'] if form.payment_method.data == 'bank_transfer' else None,
+                payer_account_name=form.payer_account_name.data if form.payment_method.data == 'bank_transfer' else None,
+                payer_account_number=form.payer_account_number.data if form.payment_method.data == 'bank_transfer' else None,
+                payer_bank_name=form.payer_bank_name.data if form.payment_method.data == 'bank_transfer' else None,
+                transaction_reference=form.transaction_reference.data if form.payment_method.data == 'bank_transfer' else None,
+                payment_notes=form.payment_notes.data,
+                payment_date=datetime.now(timezone.utc) if form.payment_method.data != 'bank_transfer' else None
+            )
+            
+            # Handle optional receipt upload
+            if form.receipt_image.data and form.receipt_image.data.filename:
+                file = form.receipt_image.data
+                filename = secure_filename(f"receipt_{request_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{file.filename}")
+                file_path = os.path.join(
+                    current_app.config['UPLOAD_FOLDER'],
+                    'receipts',
+                    filename
+                )
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                file.save(file_path)
+                payment.receipt_image = f'receipts/{filename}'
+            
+            db.session.add(payment)
+            
+            # Update service request status if payment is completed
+            if form.payment_method.data == 'cash':
+                service_request.payment_status = 'paid'
+                payment.payment_status = 'completed'
+                payment.verified_at = datetime.now(timezone.utc)
+            
+            # Create notification
+            notification = Notification(
+                user_id=current_user.id,
+                title=f'Payment {payment.payment_status}',
+                message=f'Payment of ₦{payment.amount:,.2f} for service request "{service_request.title}" has been {payment.payment_status}.',
+                notification_type='payment_update',
+                related_id=payment.id
+            )
+            db.session.add(notification)
+            
+            # Create admin notification for bank transfers
+            if form.payment_method.data == 'bank_transfer':
+                admin_notification = Notification(
+                    user_id='admin',  # Replace with actual admin user ID
+                    title='Bank Transfer Payment Pending Verification',
+                    message=f'User {current_user.full_name} has made a bank transfer payment of ₦{payment.amount:,.2f} for request #{request_id}. Receipt: {payment.receipt_image if payment.receipt_image else "Not uploaded yet"}',
+                    notification_type='payment_verification',
+                    related_id=payment.id
+                )
+                db.session.add(admin_notification)
+            
+            db.session.commit()
+            
+            flash('Payment submitted successfully!', 'success')
+            
+            if form.payment_method.data == 'bank_transfer':
+                return redirect(url_for('user_bp.payment_confirmation', payment_id=payment.id))
+            else:
+                return redirect(url_for('user_bp.view_request', request_id=request_id))
+                
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error processing payment: {str(e)}', 'danger')
+            return render_template('user/make_payment.html',
+                                 form=form,
+                                 request=service_request,
+                                 company_details=COMPANY_BANK_DETAILS)
+    elif request.method == 'POST':
+        # Form validation failed
+        flash('Please correct the errors in the form', 'danger')
+    
+    # Pre-populate form for GET request
+    if request.method == 'GET':
+        form.amount.data = amount
+    
+    return render_template('user/make_payment.html',
+                         form=form,
+                         request=service_request,
+                         company_details=COMPANY_BANK_DETAILS)
+
+@user_bp.route('/payment/confirmation/<payment_id>')
+@login_required
+def payment_confirmation(payment_id):
+    """Show payment confirmation page"""
+    payment = Payment.query.get_or_404(payment_id)
+    
+    # Check if user owns this payment
+    if payment.user_id != current_user.id:
+        flash('Unauthorized access', 'danger')
+        return redirect(url_for('user_bp.dashboard'))
+    
+    return render_template('user/payment_confirmation.html',
+                         payment=payment,
+                         company_details=COMPANY_BANK_DETAILS)
+
+@user_bp.route('/payment/upload-receipt/<payment_id>', methods=['POST'])
+@login_required
+def upload_payment_receipt(payment_id):
+    """Upload payment receipt for bank transfer"""
+    payment = Payment.query.get_or_404(payment_id)
+    
+    # Check if user owns this payment
+    if payment.user_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    if 'receipt_image' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+    
+    file = request.files['receipt_image']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    try:
+        filename = secure_filename(f"receipt_{payment_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{file.filename}")
+        file_path = os.path.join(
+            current_app.config['UPLOAD_FOLDER'],
+            'receipts',
+            filename
+        )
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        file.save(file_path)
+        
+        payment.receipt_image = f'receipts/{filename}'
+        payment.payment_status = 'processing'
+        
+        # Update notification
+        notification = Notification(
+            user_id='admin',
+            title='Payment Receipt Uploaded',
+            message=f'Receipt uploaded for payment #{payment.receipt_number} by {current_user.full_name}',
+            notification_type='receipt_uploaded',
+            related_id=payment.id
+        )
+        db.session.add(notification)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Receipt uploaded successfully',
+            'receipt_url': url_for('static', filename=f'uploads/receipts/{filename}')
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@user_bp.route('/payments/history')
+@login_required
+def payment_history():
+    """View payment history"""
+    payments = Payment.query.filter_by(user_id=current_user.id)\
+        .order_by(Payment.created_at.desc())\
+        .all()
+    
+    return render_template('user/payment_history.html', payments=payments)
+
+@user_bp.route('/payment/<payment_id>')
+@login_required
+def view_payment(payment_id):
+    """View payment details"""
+    payment = Payment.query.get_or_404(payment_id)
+    
+    # Check if user owns this payment
+    if payment.user_id != current_user.id and not current_user.is_admin:
+        flash('Unauthorized access', 'danger')
+        return redirect(url_for('user_bp.dashboard'))
+    
+    return render_template('user/view_payment.html', payment=payment)

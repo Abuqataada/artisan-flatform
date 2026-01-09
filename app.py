@@ -1,4 +1,4 @@
-from flask import Flask, render_template, url_for
+from flask import Flask, flash, render_template, url_for
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_cors import CORS
@@ -354,7 +354,7 @@ def services():
     categories = ServiceCategory.query.filter_by(is_active=True).all()
     return render_template('services.html', categories=categories)
 
-@app.route('/contact')
+@app.route('/contact') 
 def contact():
     return render_template('contact.html')
 

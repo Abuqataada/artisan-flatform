@@ -11,7 +11,7 @@
                 <p class="text-muted mb-0">Fill out the form below to request a service from our verified artisans</p>
             </div>
             <div class="card-body p-4">
-                <form method="POST" action="{{ url_for('user_bp.create_service_request') }}">
+                <form method="POST" action="{{ url_for('user_bp.create_service_request') }}" id="serviceRequestForm">
                     {{ form.hidden_tag() if form }}
                     
                     <!-- Service Details -->
@@ -73,6 +73,88 @@
                         </div>
                     </div>
                     
+                    <!-- Payment Options -->
+                    <div class="mb-4">
+                        <h5 class="mb-3"><i class="fas fa-credit-card me-2"></i>Payment Method</h5>
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Choose how you'd like to pay for this service. You can pay now or later.
+                        </div>
+                        
+                        <div class="payment-methods">
+                            <!-- Cash Option -->
+                            <div class="form-check payment-option mb-3">
+                                <input class="form-check-input" type="radio" name="payment_method" 
+                                       id="cash" value="cash" checked>
+                                <label class="form-check-label w-100" for="cash">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1"><i class="fas fa-money-bill-wave me-2"></i>Pay Cash Later</h6>
+                                            <p class="small text-muted mb-0">
+                                                Pay directly to the artisan when they complete the service. 
+                                                No upfront payment required.
+                                            </p>
+                                        </div>
+                                        <span class="badge bg-success">Recommended</span>
+                                    </div>
+                                </label>
+                            </div>
+                            
+                            <!-- Bank Transfer Option -->
+                            <div class="form-check payment-option mb-3">
+                                <input class="form-check-input" type="radio" name="payment_method" 
+                                       id="bank_transfer" value="bank_transfer">
+                                <label class="form-check-label w-100" for="bank_transfer">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1"><i class="fas fa-university me-2"></i>Bank Transfer</h6>
+                                            <p class="small text-muted mb-0">
+                                                Pay upfront via bank transfer to our company account. 
+                                                Service will begin after payment verification.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                            
+                            <!-- Paystack Option (Disabled) -->
+                            <div class="form-check payment-option mb-3">
+                                <input class="form-check-input" type="radio" name="payment_method" 
+                                       id="paystack" value="paystack" disabled>
+                                <label class="form-check-label w-100" for="paystack" style="opacity: 0.6;">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1"><i class="fas fa-credit-card me-2"></i>Online Payment (Paystack)</h6>
+                                            <p class="small text-muted mb-0">
+                                                Pay securely online with card or bank transfer. 
+                                                <span class="text-warning">Coming soon!</span>
+                                            </p>
+                                        </div>
+                                        <span class="badge bg-secondary">Coming Soon</span>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- Bank Transfer Details (Hidden by default) -->
+                        <div id="bankTransferDetails" class="mt-3" style="display: none;">
+                            <div class="alert alert-warning">
+                                <h6><i class="fas fa-info-circle me-2"></i>Bank Transfer Information</h6>
+                                <p class="mb-2">If you select Bank Transfer, you'll be redirected to make payment after submitting this form.</p>
+                                <div class="bg-light p-3 rounded">
+                                    <p class="mb-1"><strong>Account Name:</strong> Uwaila.com globals</p>
+                                    <p class="mb-1"><strong>Account Number:</strong> 1217754667</p>
+                                    <p class="mb-0"><strong>Bank:</strong> Zenith Bank</p>
+                                </div>
+                                <p class="mt-2 mb-0 small">
+                                    <i class="fas fa-exclamation-circle me-1"></i>
+                                    Please keep your transaction reference ready for verification.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Contact Information -->
                     <div class="mb-4">
                         <h5 class="mb-3"><i class="fas fa-phone-alt me-2"></i>Contact Information</h5>
@@ -124,7 +206,7 @@
                         <a href="{{ url_for('user_bp.dashboard') }}" class="btn btn-outline-secondary me-2">
                             <i class="fas fa-times me-1"></i>Cancel
                         </a>
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
                             <i class="fas fa-paper-plane me-1"></i>Submit Request
                         </button>
                     </div>
@@ -137,7 +219,7 @@
             <div class="card-body">
                 <h5 class="card-title mb-3"><i class="fas fa-sync-alt me-2"></i>What Happens Next?</h5>
                 <div class="row">
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-3 mb-3">
                         <div class="text-center p-3">
                             <div class="step-number bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
                                  style="width: 50px; height: 50px;">
@@ -147,7 +229,7 @@
                             <p class="small text-muted mb-0">Our admin reviews your request details</p>
                         </div>
                     </div>
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-3 mb-3">
                         <div class="text-center p-3">
                             <div class="step-number bg-info text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
                                  style="width: 50px; height: 50px;">
@@ -157,11 +239,21 @@
                             <p class="small text-muted mb-0">Admin selects the best artisan for your job</p>
                         </div>
                     </div>
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center p-3">
+                            <div class="step-number bg-warning text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
+                                 style="width: 50px; height: 50px;">
+                                3
+                            </div>
+                            <h6>Payment Processing</h6>
+                            <p class="small text-muted mb-0">Complete payment based on your chosen method</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
                         <div class="text-center p-3">
                             <div class="step-number bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
                                  style="width: 50px; height: 50px;">
-                                3
+                                4
                             </div>
                             <h6>Service Delivery</h6>
                             <p class="small text-muted mb-0">Assigned artisan contacts you to schedule service</p>
@@ -172,6 +264,43 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .payment-methods {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+    }
+    
+    .payment-option {
+        padding: 15px;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        transition: all 0.3s;
+    }
+    
+    .payment-option:hover {
+        border-color: #0d6efd;
+        background-color: rgba(13, 110, 253, 0.05);
+    }
+    
+    .payment-option .form-check-input:checked ~ .form-check-label {
+        color: #0d6efd;
+    }
+    
+    .payment-option .form-check-input:checked {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+    
+    .step-number {
+        font-size: 1.2rem;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
 
 {% block scripts %}
 <script>
@@ -189,6 +318,48 @@
     description.addEventListener('input', function() {
         document.getElementById('charCount').textContent = this.value.length;
     });
+    
+    // Show/hide bank transfer details
+    const cashRadio = document.getElementById('cash');
+    const bankTransferRadio = document.getElementById('bank_transfer');
+    const bankTransferDetails = document.getElementById('bankTransferDetails');
+    
+    function updatePaymentDetails() {
+        if (bankTransferRadio.checked) {
+            bankTransferDetails.style.display = 'block';
+            document.getElementById('submitBtn').innerHTML = '<i class="fas fa-paper-plane me-1"></i>Submit & Proceed to Payment';
+        } else {
+            bankTransferDetails.style.display = 'none';
+            document.getElementById('submitBtn').innerHTML = '<i class="fas fa-paper-plane me-1"></i>Submit Request';
+        }
+    }
+    
+    cashRadio.addEventListener('change', updatePaymentDetails);
+    bankTransferRadio.addEventListener('change', updatePaymentDetails);
+    
+    // Update button text on page load
+    updatePaymentDetails();
+    
+    // Form validation
+    document.getElementById('serviceRequestForm').addEventListener('submit', function(e) {
+        const title = document.getElementById('title').value.trim();
+        const category = document.getElementById('category_id').value;
+        const descriptionText = document.getElementById('description').value.trim();
+        const location = document.getElementById('location').value.trim();
+        
+        if (!title || !category || !descriptionText || !location) {
+            e.preventDefault();
+            alert('Please fill in all required fields marked with *');
+            return false;
+        }
+        
+        // For bank transfer, show confirmation
+        if (bankTransferRadio.checked) {
+            if (!confirm('You selected Bank Transfer. After submitting, you\'ll be redirected to make payment. Continue?')) {
+                e.preventDefault();
+                return false;
+            }
+        }
+    });
 </script>
-{% endblock %}
 {% endblock %}
